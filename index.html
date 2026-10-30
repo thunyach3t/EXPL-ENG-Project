@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จองห้องประชุม ห้องสมุดวิศวะ (ENG Library Chula)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Prompt & Sarabun for Thai UI) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        chula: {
+                            DEFAULT: '#7A0016',
+                            dark: '#580010',
+                            light: '#9E001C',
+                            banner: '#670000',
+                            accent: '#10B981', // Online green button
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Prompt', 'Sarabun', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Prompt', 'Sarabun', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #7A0016;
+            border-radius: 3px;
+        }
+        .accordion-content {
+            transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-gray-800 bg-gray-100 antialiased selection:bg-chula selection:text-white">
+
+    <!-- 1. Header Banner -->
+    <header class="bg-chula text-white shadow-md">
+        <div class="max-w-5xl mx-auto px-4 py-3 sm:py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <div>
+                <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2">
+                    <i class="fa-solid font-normal fa-book-open text-amber-200"></i>
+                    <span>จองห้องประชุม ห้องสมุดวิศวะ</span>
+                </h1>
+                <p class="text-xs sm:text-sm text-red-200 font-light mt-0.5">ENG Library Chula - Faculty of Engineering, Chulalongkorn University</p>
+            </div>
+            <div class="mt-2 sm:mt-0 text-xs bg-white/10 px-3 py-1.5 rounded-full border border-white/20 backdrop-blur-sm">
+                <i class="fa-solid fa-clock text-amber-300 mr-1"></i>
+                <span id="live-clock">00:00:00</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 2. Announcement Marquee / Notice Banner -->
+    <div class="bg-chula-banner text-white text-xs sm:text-sm font-medium py-2.5 px-4 text-center shadow-inner flex items-center justify-center gap-2">
+        <span class="animate-bounce inline-block">📢</span>
+        <span>ต่อเวลาห้อง ย้ายห้อง ติดต่อเจ้าหน้าที่เคาน์เตอร์หรือทักข้อความมาในไลน์ได้เลยครับ</span>
+    </div>
+
+    <!-- Main Content Container -->
+    <main class="max-w-5xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 flex-grow">
+
+        <!-- ================= PAGE 1: HOME ACCORDION VIEW ================= -->
+        <div id="page-home" class="space-y-4 sm:space-y-5">
+            <!-- Student ID Lookup Section -->
+            <section class="bg-white rounded-xl p-4 sm:p-5 shadow-sm border border-gray-200">
+                <label for="search-student-id" class="block font-semibold text-gray-700 mb-2 flex items-center gap-2 text-sm sm:text-base">
+                    <i class="fa-solid fa-magnifying-glass text-chula"></i>
+                    <span>เช็คห้องที่จอง</span>
+                </label>
+                <form id="search-form" onsubmit="handleSearch(event)" class="flex flex-col sm:flex-row gap-2">
+                    <input 
+                        type="text" 
+                        id="search-student-id" 
+                        placeholder="รหัสนิสิต 10 หลัก" 
+                        maxlength="10"
+                        pattern="[0-9]{10}"
+                        required
+                        class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-chula text-sm sm:text-base"
+                    >
+                    <button 
+                        type="submit" 
+                        class="bg-chula hover:bg-chula-dark text-white font-medium px-6 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shrink-0 shadow-sm text-sm sm:text-base"
+                    >
+                        <span>ค้นหา</span>
+                    </button>
+                </form>
+            </section>
+
+            <!-- Date Selector Tabs & Last Updated Info -->
+            <section>
+                <div class="grid grid-cols-2 gap-2 sm:gap-3 bg-gray-200 p-1.5 rounded-xl shadow-inner text-center font-medium">
+                    <button 
+                        id="tab-today" 
+                        onclick="switchDateTab('today')" 
+                        class="py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 bg-white text-chula shadow font-semibold flex flex-col items-center justify-center"
+                    >
+                        <span class="text-xs text-gray-500 font-normal">วันนี้</span>
+                        <span id="display-date-today">-- -- ----</span>
+                    </button>
+                    <button 
+                        id="tab-tomorrow" 
+                        onclick="switchDateTab('tomorrow')" 
+                        class="py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 text-gray-600 hover:text-chula flex flex-col items-center justify-center"
+                    >
+                        <span class="text-xs text-gray-400 font-normal">พรุ่งนี้</span>
+                        <span id="display-date-tomorrow">-- -- ----</span>
+                    </button>
+                </div>
+                <div class="text-right text-xs text-gray-500 mt-2 pr-1 flex items-center justify-end gap-1">
+                    <i class="fa-solid fa-arrows-rotate text-gray-400"></i>
+                    <span>อัปเดตล่าสุด: <span id="last-updated-time">--:-- น.</span></span>
+                </div>
+            </section>
+
+            <!-- Room Accordion Categories -->
+            <section class="space-y-3" id="room-accordion-container">
+                <!-- Accordions injected via JS -->
+            </section>
+        </div>
+
+        <!-- ================= PAGE 2: TIME SLOTS VIEW (15-MIN INTERVALS) ================= -->
+        <div id="page-time-slots" class="hidden space-y-4">
+            <!-- Date Banner Bar -->
+            <div class="grid grid-cols-2 gap-2 sm:gap-3 bg-gray-200 p-1.5 rounded-xl text-center font-medium opacity-90 pointer-events-none">
+                <div id="timeslot-date-today" class="py-2.5 px-4 rounded-lg text-xs sm:text-sm text-gray-600 flex flex-col items-center justify-center">
+                    <span class="text-[10px] text-gray-400">วันนี้</span>
+                    <span id="ts-date-today-val">--</span>
+                </div>
+                <div id="timeslot-date-tomorrow" class="py-2.5 px-4 rounded-lg text-xs sm:text-sm text-gray-600 flex flex-col items-center justify-center">
+                    <span class="text-[10px] text-gray-400">พรุ่งนี้</span>
+                    <span id="ts-date-tomorrow-val">--</span>
+                </div>
+            </div>
+
+            <div class="text-right text-xs text-gray-500 pr-1">
+                <span>อัปเดตล่าสุด: <span class="last-updated-val">--:-- น.</span></span>
+            </div>
+
+            <!-- Page Navigation Header -->
+            <div class="flex items-center gap-3 pt-1 pb-2">
+                <button 
+                    onclick="navigateToPage('home')" 
+                    class="bg-white hover:bg-gray-100 text-chula border border-gray-300 font-medium px-4 py-1.5 rounded-lg text-sm flex items-center gap-1.5 shadow-sm transition-colors"
+                >
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>กลับ</span>
+                </button>
+                <h2 id="timeslot-room-title" class="text-lg sm:text-xl font-bold text-gray-800">Seminar Room A</h2>
+            </div>
+
+            <!-- Time Slots Grid (4 Columns) -->
+            <div id="time-grid-container" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                <!-- Dynamically generated 15-min slots from 09:00 to 16:45 -->
+            </div>
+        </div>
+
+        <!-- ================= PAGE 3: BOOKING FORM VIEW ================= -->
+        <div id="page-booking-form" class="hidden space-y-4">
+            <!-- Red Notice Banner -->
+            <div class="bg-red-50 border border-red-200 text-chula px-4 py-3 rounded-lg text-xs sm:text-sm flex items-center gap-2 shadow-sm font-medium">
+                <i class="fa-solid fa-thumbtack text-chula text-sm"></i>
+                <span>วันที่ ห้อง และเวลาถูกล็อกตามที่เลือกในตาราง</span>
+            </div>
+
+            <form id="main-booking-form" onsubmit="handleFormSubmission(event)" class="space-y-4">
+                <!-- Section 1: ข้อมูลผู้จอง -->
+                <div class="bg-white rounded-xl p-4 sm:p-5 border border-gray-200 space-y-2 shadow-sm">
+                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider">ข้อมูลผู้จอง</div>
+                    <label class="block text-sm font-bold text-gray-800">ชื่อผู้จอง</label>
+                    <input 
+                        type="text" 
+                        id="form-student-name" 
+                        placeholder="ชื่อจริงหรือชื่อเล่น" 
+                        required
+                        class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-chula text-sm bg-white"
+                    >
+                </div>
+
+                <!-- Section 2: วันที่และห้อง -->
+                <div class="bg-white rounded-xl p-4 sm:p-5 border border-gray-200 space-y-3.5 shadow-sm">
+                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider">วันที่และห้อง</div>
+                    
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">วันที่จอง</label>
+                        <select id="form-date-select" class="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm focus:outline-none cursor-not-allowed" disabled>
+                            <!-- Date option -->
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">ประเภทห้อง</label>
+                        <select id="form-category-select" class="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm focus:outline-none cursor-not-allowed" disabled>
+                            <!-- Category option -->
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">ห้อง</label>
+                        <select id="form-room-select" class="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-700 text-sm focus:outline-none cursor-not-allowed" disabled>
+                            <!-- Room option -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Section 3: กรอกรหัสนิสิต (6 คน) -->
+                <div class="bg-white rounded-xl p-4 sm:p-5 border border-gray-200 space-y-3 shadow-sm">
+                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider">กรอกรหัสนิสิต (6 คน)</div>
+                    
+                    <div class="space-y-2">
+                        <input 
+                            type="text" 
+                            id="form-student-id-1" 
+                            placeholder="รหัสนิสิต คนที่ 1 (ผู้จอง)" 
+                            maxlength="10"
+                            pattern="[0-9]{10}"
+                            required
+                            class="w-full px-4 py-2.5 rounded-lg border border-gray-300 bg-gray-100 font-medium text-gray-800 text-sm"
+                        >
+                        <input 
+                            type="text" 
+                            id="form-student-id-2" 
+                            placeholder="คนที่ 2" 
+                            maxlength="10"
+                            class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-chula text-sm"
+                        >
+                        <input 
+                            type="text" 
+                            id="form-student-id-3" 
+                            placeholder="คนที่ 3" 
+                            maxlength="10"
+                            class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-chula text-sm"
+                        >
+                        <input 
+                            type="text" 
+                            id="form-student-id-4" 
+                            placeholder="คนที่ 4" 
+                            maxlength="10"
+                            class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-chula text-sm"
+                        >
+                        <input 
+                            type="text" 
+                            id="form-student-id-5" 
+                            placeholder="คนที่ 5" 
+                            maxlength="10"
+                            class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-chula text-sm"
+                        >
+                        <input 
+                            type="text" 
+                            id="form-student-id-6" 
+                            placeholder="คนที่ 6" 
+                            maxlength="10"
+                            class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-chula text-sm"
+                        >
+                    </div>
+                </div>
+
+                <!-- Section 4: เวลาที่จอง (สูงสุด 2 ชั่วโมง) -->
+                <div class="bg-white rounded-xl p-4 sm:p-5 border border-gray-200 space-y-3 shadow-sm">
+                    <div class="text-xs text-gray-500 font-semibold uppercase tracking-wider">เวลาที่จอง (สูงสุด 2 ชั่วโมง)</div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <select id="form-start-time" class="w-full px-3.5 py-2.5 rounded-lg border border-gray-200 bg-gray-100 text-gray-700 text-sm focus:outline-none cursor-not-allowed" disabled>
+                                <!-- Selected start time -->
+                            </select>
+                        </div>
+                        <div>
+                            <select id="form-end-time" class="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-chula font-semibold">
+                                <!-- Generated end times (15 min steps up to 2 hours) -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button 
+                    type="submit" 
+                    class="w-full bg-chula hover:bg-chula-dark text-white font-bold py-3.5 rounded-xl shadow-md transition-colors text-base"
+                >
+                    ยืนยันการจอง
+                </button>
+            </form>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-gray-300 text-xs py-6 mt-8 border-t border-gray-700">
+        <div class="max-w-5xl mx-auto px-4 text-center space-y-2">
+            <p class="font-medium text-gray-200">ห้องสมุดคณะวิศวกรรมศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย</p>
+            <p class="text-gray-400">เวลาทำการ: จันทร์ - ศุกร์ 08:00 - 19:00 น. | เสาร์ 09:00 - 16:00 น.</p>
+            <p class="text-gray-500 pt-2 border-t border-gray-700/50">© ENG Library Chula Room Reservation Prototype</p>
+        </div>
+    </footer>
+
+    <!-- 7. Booking Modal / Form -->
+    <div id="booking-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl transform transition-all duration-300 scale-95 opacity-0 modal-card">
+            <!-- Modal Header -->
+            <div class="bg-chula text-white p-4 sm:p-5 flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-lg" id="modal-room-title">จองห้องประชุม</h3>
+                    <p class="text-xs text-red-200" id="modal-booking-date">วันที่เลือก: --</p>
+                </div>
+                <button onclick="closeBookingModal()" class="text-white/80 hover:text-white text-xl w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Form Body -->
+            <form id="booking-form" onsubmit="submitBooking(event)" class="p-5 space-y-4">
+                <!-- Select Time Slot -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                        <i class="fa-solid fa-clock text-chula mr-1"></i> เลือกรอบเวลาที่ต้องการจอง
+                    </label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="time-slots-container">
+                        <!-- Time slots generated dynamically -->
+                    </div>
+                    <p id="time-slot-error" class="text-xs text-red-500 mt-1 hidden">กรุณาเลือกรอบเวลาอย่างน้อย 1 รอบ</p>
+                </div>
+
+                <!-- Student ID Input -->
+                <div>
+                    <label for="book-student-id" class="block text-sm font-semibold text-gray-700 mb-1">
+                        รหัสนิสิต (10 หลัก) <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="book-student-id" 
+                        placeholder="เช่น 663xxxxx21" 
+                        maxlength="10" 
+                        pattern="[0-9]{10}"
+                        required
+                        class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-chula text-sm"
+                    >
+                </div>
+
+                <!-- Full Name Input -->
+                <div>
+                    <label for="book-student-name" class="block text-sm font-semibold text-gray-700 mb-1">
+                        ชื่อ-นามสกุล นิสิต <span class="text-red-500">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="book-student-name" 
+                        placeholder="นายสมชาย ใจดี" 
+                        required
+                        class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-chula text-sm"
+                    >
+                </div>
+
+                <!-- Contact Phone -->
+                <div>
+                    <label for="book-student-phone" class="block text-sm font-semibold text-gray-700 mb-1">
+                        เบอร์โทรศัพท์ติดต่อ
+                    </label>
+                    <input 
+                        type="tel" 
+                        id="book-student-phone" 
+                        placeholder="08X-XXX-XXXX" 
+                        maxlength="10"
+                        class="w-full px-3.5 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-chula text-sm"
+                    >
+                </div>
+
+                <!-- Rules Checkbox -->
+                <div class="bg-amber-50 p-3 rounded-lg border border-amber-200 text-xs text-amber-800 space-y-1">
+                    <p class="font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i> เงื่อนไขการใช้งาน:</p>
+                    <ul class="list-disc list-inside space-y-0.5 text-amber-700">
+                        <li>กรุณาแสดงบัตรนิสิตเพื่อติดต่อขอรับกุญแจห้องที่เคาน์เตอร์</li>
+                        <li>หากไม่มารับห้องภายใน 15 นาทีถือว่าสละสิทธิ์</li>
+                    </ul>
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="flex gap-2 pt-2">
+                    <button 
+                        type="button" 
+                        onclick="closeBookingModal()" 
+                        class="w-1/3 py-2.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 font-medium text-sm transition-colors"
+                    >
+                        ยกเลิก
+                    </button>
+                    <button 
+                        type="submit" 
+                        class="w-2/3 py-2.5 rounded-lg bg-chula hover:bg-chula-dark text-white font-semibold text-sm transition-colors shadow-md"
+                    >
+                        ยืนยันการจองห้อง
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Search Result Modal -->
+    <div id="search-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl transform transition-all duration-300 scale-95 opacity-0 search-card">
+            <div class="bg-chula text-white p-4 sm:p-5 flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-lg"><i class="fa-solid fa-id-card mr-2"></i>ประวัติการจองห้อง</h3>
+                    <p class="text-xs text-red-200" id="search-modal-subtitle">รหัสนิสิต: -</p>
+                </div>
+                <button onclick="closeSearchModal()" class="text-white/80 hover:text-white text-xl w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="p-5">
+                <div id="search-results-list" class="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                    <!-- Results dynamically inserted -->
+                </div>
+
+                <div class="mt-5 text-right">
+                    <button 
+                        onclick="closeSearchModal()" 
+                        class="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium text-sm rounded-lg transition-colors"
+                    >
+                        ปิดหน้าต่าง
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <div id="toast-content" class="bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm border border-gray-700">
+            <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+            <span id="toast-msg">ข้อความแจ้งเตือน</span>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- Room Database Configuration ---
+        const ROOM_CATEGORIES = [
+            {
+                id: 'cat-seminar',
+                title: 'Seminar Room ชั้น 3',
+                defaultOpen: true,
+                rooms: [
+                    { id: 'seminar-a', name: 'Seminar Room A', capacity: '10-15 คน' },
+                    { id: 'seminar-b', name: 'Seminar Room B', capacity: '10-15 คน' },
+                    { id: 'seminar-c', name: 'Seminar Room C', capacity: '8-12 คน' }
+                ]
+            },
+            {
+                id: 'cat-study',
+                title: 'Study Room ชั้น 4',
+                defaultOpen: false,
+                rooms: [
+                    { id: 'study-1', name: 'Study Room 1', capacity: '4-6 คน' },
+                    { id: 'study-2', name: 'Study Room 2', capacity: '4-6 คน' },
+                    { id: 'study-3', name: 'Study Room 3', capacity: '4-6 คน' },
+                    { id: 'study-4', name: 'Study Room 4', capacity: '4-6 คน' },
+                    { id: 'study-5', name: 'Study Room 5', capacity: '6-8 คน' },
+                    { id: 'study-6', name: 'Study Room 6', capacity: '6-8 คน' },
+                    { id: 'study-7', name: 'Study Room 7', capacity: '6-8 คน' }
+                ]
+            },
+            {
+                id: 'cat-box',
+                title: 'The Box',
+                defaultOpen: false,
+                rooms: [
+                    { id: 'box-a', name: 'The Box A', capacity: '1-2 คน' },
+                    { id: 'box-b', name: 'The Box B', capacity: '1-2 คน' },
+                    { id: 'box-c', name: 'The Box C', capacity: '1-2 คน' },
+                    { id: 'box-d', name: 'The Box D', capacity: '1-2 คน' },
+                    { id: 'box-e', name: 'The Box E', capacity: '2-4 คน' },
+                    { id: 'box-f', name: 'The Box F', capacity: '2-4 คน' }
+                ]
+            }
+        ];
+
+        // 15-Minute Interval Generator (09:00 - 16:45)
+        function generate15MinSlots() {
+            const slots = [];
+            for (let hour = 9; hour <= 16; hour++) {
+                for (let min = 0; min < 60; min += 15) {
+                    const hStr = String(hour).padStart(2, '0');
+                    const mStr = String(min).padStart(2, '0');
+                    slots.push(`${hStr}:${mStr}`);
+                }
+            }
+            return slots;
+        }
+
+        const TIME_SLOTS_15MIN = generate15MinSlots();
+
+        // --- Application State ---
+        let selectedDateType = 'today'; // 'today' or 'tomorrow'
+        let selectedCategory = null;
+        let selectedRoom = null;
+        let selectedStartTime = null;
+        let bookingsState = [];
+
+        // Formatting Helpers
+        const formatThaiDate = (date) => {
+            const thaiMonths = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+            return `${date.getDate()} ${thaiMonths[date.getMonth()]} ${date.getFullYear() + 543}`;
+        };
+
+        const getFormattedDateString = (type) => {
+            const d = new Date();
+            if (type === 'tomorrow') d.setDate(d.getDate() + 1);
+            return formatThaiDate(d);
+        };
+
+        // Page Router Function
+        function navigateToPage(pageName) {
+            document.getElementById('page-home').classList.add('hidden');
+            document.getElementById('page-time-slots').classList.add('hidden');
+            document.getElementById('page-booking-form').classList.add('hidden');
+
+            if (pageName === 'home') {
+                document.getElementById('page-home').classList.remove('hidden');
+            } else if (pageName === 'time-slots') {
+                document.getElementById('page-time-slots').classList.remove('hidden');
+            } else if (pageName === 'booking-form') {
+                document.getElementById('page-booking-form').classList.remove('hidden');
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        window.onload = function() {
+            loadBookingsFromStorage();
+
+            const today = new Date();
+            const tomorrow = new Date();
+            tomorrow.setDate(today.getDate() + 1);
+
+            const todayFormatted = formatThaiDate(today);
+            const tomorrowFormatted = formatThaiDate(tomorrow);
+
+            document.getElementById('display-date-today').textContent = todayFormatted;
+            document.getElementById('display-date-tomorrow').textContent = tomorrowFormatted;
+
+            document.getElementById('ts-date-today-val').textContent = todayFormatted;
+            document.getElementById('ts-date-tomorrow-val').textContent = tomorrowFormatted;
+
+            updateTimestamp();
+            renderAccordions();
+            startClock();
+        };
+
+        function startClock() {
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('live-clock').textContent = now.toLocaleTimeString('th-TH');
+            }, 1000);
+        }
+
+        function updateTimestamp() {
+            const now = new Date();
+            const hrs = String(now.getHours()).padStart(2, '0');
+            const mins = String(now.getMinutes()).padStart(2, '0');
+            const timeStr = `${hrs}:${mins} น.`;
+            document.getElementById('last-updated-time').textContent = timeStr;
+            document.querySelectorAll('.last-updated-val').forEach(el => el.textContent = timeStr);
+        }
+
+        // --- Render Page 1 Accordions ---
+        function renderAccordions() {
+            const container = document.getElementById('room-accordion-container');
+            container.innerHTML = '';
+
+            ROOM_CATEGORIES.forEach((cat) => {
+                const isOpened = cat.defaultOpen;
+                const accordionHTML = `
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <button 
+                            onclick="toggleAccordion('${cat.id}')"
+                            class="w-full bg-chula hover:bg-chula-dark text-white px-4 sm:px-5 py-3.5 sm:py-4 flex justify-between items-center transition-colors text-left font-semibold text-base sm:text-lg"
+                        >
+                            <span>${cat.title}</span>
+                            <i id="icon-${cat.id}" class="fa-solid fa-chevron-down transition-transform duration-300 ${isOpened ? 'rotate-180' : ''}"></i>
+                        </button>
+
+                        <div id="content-${cat.id}" class="accordion-content ${isOpened ? 'block' : 'hidden'} divide-y divide-gray-100">
+                            ${cat.rooms.map(room => `
+                                <div class="px-4 sm:px-6 py-3.5 flex items-center justify-between hover:bg-gray-50/80 transition-colors">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-1.5 h-6 bg-chula rounded-full opacity-75"></div>
+                                        <h4 class="font-bold text-gray-800 text-sm sm:text-base">${room.name}</h4>
+                                    </div>
+                                    <button 
+                                        onclick="goToTimeSlotPage('${cat.id}', '${room.id}')" 
+                                        class="text-chula-accent hover:text-emerald-700 font-medium text-xs sm:text-sm flex items-center gap-1 transition-all"
+                                    >
+                                        <span>จองออนไลน์</span>
+                                        <i class="fa-solid fa-chevron-right text-xs"></i>
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', accordionHTML);
+            });
+        }
+
+        function toggleAccordion(catId) {
+            const content = document.getElementById(`content-${catId}`);
+            const icon = document.getElementById(`icon-${catId}`);
+
+            if (content.classList.contains('hidden')) {
+                content.classList.remove('hidden');
+                icon.classList.add('rotate-180');
+            } else {
+                content.classList.add('hidden');
+                icon.classList.remove('rotate-180');
+            }
+        }
+
+        function switchDateTab(type) {
+            selectedDateType = type;
+            const btnToday = document.getElementById('tab-today');
+            const btnTomorrow = document.getElementById('tab-tomorrow');
+
+            const tsToday = document.getElementById('timeslot-date-today');
+            const tsTomorrow = document.getElementById('timeslot-date-tomorrow');
+
+            if (type === 'today') {
+                btnToday.className = "py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 bg-white text-chula shadow font-semibold flex flex-col items-center justify-center";
+                btnTomorrow.className = "py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 text-gray-600 hover:text-chula flex flex-col items-center justify-center";
+                tsToday.className = "py-2.5 px-4 rounded-lg text-xs sm:text-sm bg-white text-chula font-bold shadow flex flex-col items-center justify-center";
+                tsTomorrow.className = "py-2.5 px-4 rounded-lg text-xs sm:text-sm text-gray-600 flex flex-col items-center justify-center";
+            } else {
+                btnTomorrow.className = "py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 bg-white text-chula shadow font-semibold flex flex-col items-center justify-center";
+                btnToday.className = "py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 text-gray-600 hover:text-chula flex flex-col items-center justify-center";
+                tsTomorrow.className = "py-2.5 px-4 rounded-lg text-xs sm:text-sm bg-white text-chula font-bold shadow flex flex-col items-center justify-center";
+                tsToday.className = "py-2.5 px-4 rounded-lg text-xs sm:text-sm text-gray-600 flex flex-col items-center justify-center";
+            }
+        }
+
+        // --- Page 2: Time Slot Logic ---
+        function goToTimeSlotPage(catId, roomId) {
+            selectedCategory = ROOM_CATEGORIES.find(c => c.id === catId);
+            selectedRoom = selectedCategory.rooms.find(r => r.id === roomId);
+
+            document.getElementById('timeslot-room-title').textContent = selectedRoom.name;
+            switchDateTab(selectedDateType);
+
+            // Render Time Slot Buttons Grid
+            const container = document.getElementById('time-grid-container');
+            container.innerHTML = '';
+
+            TIME_SLOTS_15MIN.forEach(slot => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = "bg-white hover:bg-gray-50 border border-gray-200 hover:border-chula text-gray-800 font-bold py-3 px-2 rounded-xl text-center shadow-sm transition-all duration-150 text-sm sm:text-base active:scale-95";
+                btn.textContent = slot;
+                btn.onclick = () => goToBookingFormPage(slot);
+                container.appendChild(btn);
+            });
+
+            navigateToPage('time-slots');
+        }
+
+        // --- Page 3: Booking Form Logic ---
+        function goToBookingFormPage(timeSlot) {
+            selectedStartTime = timeSlot;
+
+            // Populate Section 2 Readonly Dropdowns
+            const dateSelect = document.getElementById('form-date-select');
+            dateSelect.innerHTML = `<option>${getFormattedDateString(selectedDateType)}</option>`;
+
+            const catSelect = document.getElementById('form-category-select');
+            catSelect.innerHTML = `<option>${selectedCategory.title}</option>`;
+
+            const roomSelect = document.getElementById('form-room-select');
+            roomSelect.innerHTML = `<option>${selectedRoom.name}</option>`;
+
+            // Populate Start Time
+            const startSelect = document.getElementById('form-start-time');
+            startSelect.innerHTML = `<option>${selectedStartTime}</option>`;
+
+            // Populate End Time Dropdown (up to 2 hours with 15-minute intervals)
+            const endSelect = document.getElementById('form-end-time');
+            endSelect.innerHTML = '';
+
+            const [startH, startM] = selectedStartTime.split(':').map(Number);
+            let startInMins = startH * 60 + startM;
+
+            // Generate options for +15, +30, +45, +60, +75, +90, +105, +120 mins
+            for (let step = 15; step <= 120; step += 15) {
+                const totalMins = startInMins + step;
+                const endH = Math.floor(totalMins / 60);
+                const endM = totalMins % 60;
+
+                if (endH > 19) break; // Library closing time safeguard
+
+                const formattedH = String(endH).padStart(2, '0');
+                const formattedM = String(endM).padStart(2, '0');
+                const timeText = `${formattedH}:${formattedM} น.`;
+
+                const opt = document.createElement('option');
+                opt.value = `${formattedH}:${formattedM}`;
+                opt.textContent = timeText;
+                
+                // Default select +2 hours or maximum step
+                if (step === 120 || totalMins === 19 * 60) {
+                    opt.selected = true;
+                }
+                endSelect.appendChild(opt);
+            }
+
+            // Auto fill first student ID if searched previously
+            const searchVal = document.getElementById('search-student-id').value.trim();
+            if (searchVal.length === 10) {
+                document.getElementById('form-student-id-1').value = searchVal;
+            } else {
+                document.getElementById('form-student-id-1').value = '6930123521'; // Preset sample ID from screenshot
+            }
+
+            navigateToPage('booking-form');
+        }
+
+        // --- Handle Final Booking Submission ---
+        function handleFormSubmission(e) {
+            e.preventDefault();
+
+            const studentName = document.getElementById('form-student-name').value.trim();
+            const mainStudentId = document.getElementById('form-student-id-1').value.trim();
+            const endTimeVal = document.getElementById('form-end-time').value;
+
+            // Collect secondary student IDs
+            const otherIds = [];
+            for (let i = 2; i <= 6; i++) {
+                const val = document.getElementById(`form-student-id-${i}`).value.trim();
+                if (val) otherIds.push(val);
+            }
+
+            const newBooking = {
+                id: 'BK-' + Date.now(),
+                roomName: selectedRoom.name,
+                categoryName: selectedCategory.title,
+                date: getFormattedDateString(selectedDateType),
+                timeSlot: `${selectedStartTime} - ${endTimeVal} น.`,
+                studentName: studentName,
+                studentId: mainStudentId,
+                otherStudents: otherIds,
+                timestamp: new Date().toLocaleString('th-TH')
+            };
+
+            bookingsState.push(newBooking);
+            saveBookingsToStorage();
+
+            showToast(`จองห้อง ${selectedRoom.name} สำเร็จแล้ว!`, 'success');
+
+            // Reset form and return home
+            document.getElementById('main-booking-form').reset();
+            navigateToPage('home');
+        }
+
+        // --- Search Modal Logic ---
+        function handleSearch(e) {
+            e.preventDefault();
+            const searchId = document.getElementById('search-student-id').value.trim();
+
+            if (searchId.length !== 10) {
+                showToast('กรุณากรอกรหัสนิสิตให้ครบ 10 หลัก', 'error');
+                return;
+            }
+
+            const userBookings = bookingsState.filter(b => b.studentId === searchId);
+            
+            document.getElementById('search-modal-subtitle').textContent = `รหัสนิสิต: ${searchId}`;
+            const container = document.getElementById('search-results-list');
+            container.innerHTML = '';
+
+            if (userBookings.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-500 space-y-2">
+                        <i class="fa-solid fa-calendar-xmark text-4xl text-gray-300"></i>
+                        <p class="font-medium text-sm">ไม่พบประวัติการจองห้องสำหรับรหัสนิสิตนี้</p>
+                    </div>
+                `;
+            } else {
+                userBookings.forEach(b => {
+                    const bookingHTML = `
+                        <div class="bg-gray-50 border border-gray-200 rounded-xl p-3.5 flex justify-between items-center hover:border-chula/30 transition-colors">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-gray-800 text-sm sm:text-base">${b.roomName}</span>
+                                    <span class="text-[11px] bg-chula/10 text-chula font-semibold px-2 py-0.5 rounded-full">${b.date}</span>
+                                </div>
+                                <p class="text-xs text-gray-600"><i class="fa-solid fa-clock text-gray-400 mr-1"></i>เวลา: <span class="font-medium text-gray-800">${b.timeSlot}</span></p>
+                                <p class="text-xs text-gray-500"><i class="fa-solid fa-user text-gray-400 mr-1"></i>ชื่อผู้จอง: ${b.studentName}</p>
+                            </div>
+                            <button 
+                                onclick="cancelBooking('${b.id}')"
+                                class="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded-lg border border-red-200 transition-colors shrink-0"
+                            >
+                                <i class="fa-solid fa-trash-can mr-1"></i>ยกเลิก
+                            </button>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', bookingHTML);
+                });
+            }
+
+            const modal = document.getElementById('search-modal');
+            const card = modal.querySelector('.search-card');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                card.classList.remove('scale-95', 'opacity-0');
+                card.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeSearchModal() {
+            const modal = document.getElementById('search-modal');
+            const card = modal.querySelector('.search-card');
+            
+            card.classList.remove('scale-100', 'opacity-100');
+            card.classList.add('scale-95', 'opacity-0');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        function cancelBooking(bookingId) {
+            bookingsState = bookingsState.filter(b => b.id !== bookingId);
+            saveBookingsToStorage();
+            closeSearchModal();
+            showToast('ยกเลิกรายการจองเรียบร้อยแล้ว', 'info');
+        }
+
+        function saveBookingsToStorage() {
+            localStorage.setItem('eng_lib_bookings', JSON.stringify(bookingsState));
+        }
+
+        function loadBookingsFromStorage() {
+            const saved = localStorage.getItem('eng_lib_bookings');
+            if (saved) {
+                try { bookingsState = JSON.parse(saved); } catch (e) { bookingsState = []; }
+            } else {
+                bookingsState = [];
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const msgEl = document.getElementById('toast-msg');
+            const iconEl = document.getElementById('toast-icon');
+
+            msgEl.textContent = message;
+            if (type === 'success') iconEl.className = 'fa-solid fa-circle-check text-emerald-400 text-lg';
+            else if (type === 'error') iconEl.className = 'fa-solid fa-circle-xmark text-red-400 text-lg';
+            else iconEl.className = 'fa-solid fa-circle-info text-blue-400 text-lg';
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
