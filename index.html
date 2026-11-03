@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>จองห้องประชุม - ENG Library Chula</title>
   
-  <!-- Tailwind CSS & FontAwesome Icons -->
+  <!-- Tailwind CSS & Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -32,12 +32,11 @@
     body { font-family: 'Kanit', sans-serif; }
   </style>
 
-  <!-- Firebase SDKs (v9 Compat) -->
+  <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
   <script>
-    // Firebase Configuration
     const firebaseConfig = {
       apiKey: "AIzaSyAAIQqx48PCSJbo3kKbZ1QPOg4hO_VFxR8",
       authDomain: "expl-eng.firebaseapp.com",
@@ -46,97 +45,110 @@
       messagingSenderId: "317681931288",
       appId: "1:317681931288:web:2b7d48c63dd9285e799f6d"
     };
-
-    // Initialize Firebase & Firestore
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
   </script>
 </head>
 <body class="bg-gray-100 dark:bg-chula-darkBg text-gray-800 dark:text-gray-100 min-h-screen transition-colors duration-200">
 
-  <!-- Header Section -->
-  <header class="bg-chula-main text-white shadow-md">
-    <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-      <div class="flex items-center space-x-3">
+  <!-- Header Bar -->
+  <header class="bg-chula-main text-white shadow-md sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="showPage('pageRoomList')">
         <i class="fa-solid fa-book-bookmark text-2xl"></i>
         <div>
-          <h1 class="text-xl font-bold leading-tight">จองห้องประชุม ห้องสมุดวิศวะ</h1>
+          <h1 class="text-lg font-bold leading-tight">จองห้องประชุม ห้องสมุดวิศวะ</h1>
           <p class="text-xs text-red-200">ENG Library Chula</p>
         </div>
       </div>
+
+      <!-- Top Right Action Controls -->
       <div class="flex items-center space-x-3">
-        <!-- Theme Toggle Button -->
-        <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2 rounded-full hover:bg-chula-hover transition">
+        <!-- Notification Bell Hub -->
+        <div class="relative" id="notiBellContainer">
+          <button onclick="toggleNotiDropdown()" class="p-2 rounded-full hover:bg-chula-hover transition relative">
+            <i class="fa-solid fa-bell text-lg"></i>
+            <span id="notiBadge" class="hidden absolute top-0 right-0 w-4 h-4 bg-yellow-400 text-black font-bold text-[10px] rounded-full flex items-center justify-center">0</span>
+          </button>
+
+          <!-- Notification Dropdown Menu -->
+          <div id="notiDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white dark:bg-chula-darkCard rounded-xl shadow-2xl border dark:border-gray-800 text-gray-800 dark:text-gray-100 z-50 p-3">
+            <div class="font-bold border-b pb-2 mb-2 flex justify-between items-center text-sm">
+              <span><i class="fa-solid fa-bell text-chula-main mr-1"></i> คำขอและการแจ้งเตือน</span>
+              <span id="notiCountLabel" class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">0</span>
+            </div>
+            <div id="notiList" class="space-y-2 max-h-64 overflow-y-auto text-xs divide-y dark:divide-gray-800">
+              <p class="text-center text-gray-400 py-3">ไม่มีคำขอที่ค้างอยู่</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dark/Light Theme Toggle -->
+        <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-chula-hover transition">
           <i id="themeIcon" class="fa-solid fa-moon text-lg"></i>
         </button>
-        <!-- Login Info Status -->
-        <div id="userInfoHeader" class="hidden text-sm bg-chula-hover px-3 py-1.5 rounded-lg flex items-center space-x-2">
-          <i class="fa-solid fa-user-graduate"></i>
-          <span id="userEmailSpan"></span>
-          <button onclick="logout()" class="ml-2 text-xs text-red-300 hover:text-white underline">(ออกจากระบบ)</button>
+
+        <!-- Login / User Profile Corner -->
+        <div id="authCorner">
+          <button id="btnLoginCorner" onclick="openLoginModal()" class="px-3 py-1.5 bg-white text-chula-main text-xs font-bold rounded-lg hover:bg-gray-100 shadow transition flex items-center space-x-1">
+            <i class="fa-solid fa-right-to-bracket"></i>
+            <span>เข้าสู่ระบบ</span>
+          </button>
+
+          <div id="userInfoCorner" class="hidden text-xs bg-chula-hover px-3 py-1.5 rounded-lg flex items-center space-x-2">
+            <i class="fa-solid fa-user-graduate text-yellow-300"></i>
+            <span id="userEmailSpan" class="font-mono font-semibold"></span>
+            <button onclick="logout()" class="text-red-300 hover:text-white underline ml-1">(ออก)</button>
+          </div>
         </div>
       </div>
     </div>
-    <!-- Banner Announcement -->
-    <div class="bg-chula-hover text-center py-2 px-4 text-sm flex items-center justify-center space-x-2">
+    <div class="bg-chula-hover text-center py-1.5 px-4 text-xs flex items-center justify-center space-x-2">
       <i class="fa-solid fa-bullhorn text-yellow-300"></i>
       <span>ต่อเวลาห้อง ย้ายห้อง ติดต่อเจ้าหน้าที่เคาน์เตอร์หรือทักข้อความในไลน์ได้เลยครับ</span>
     </div>
   </header>
 
-  <!-- Login Modal / Screen (If not logged in) -->
-  <div id="loginSection" class="max-w-md mx-auto mt-10 p-6 bg-white dark:bg-chula-darkCard rounded-xl shadow-lg">
-    <h2 class="text-xl font-bold text-center text-chula-main dark:text-red-400 mb-4">
-      <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
-    </h2>
-    <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
-      กรุณาใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิตลงท้าย 21)
-    </p>
-    <form onsubmit="handleLogin(event)" class="space-y-4">
-      <div>
-        <label class="block text-sm font-medium mb-1">อีเมลนิสิต</label>
-        <input type="email" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th"
-          class="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-chula-main outline-none">
-      </div>
-      <p id="loginError" class="text-xs text-red-500 hidden"></p>
-      <button type="submit" class="w-full py-2.5 bg-chula-main hover:bg-chula-hover text-white font-medium rounded-lg shadow transition">
-        เข้าสู่ระบบเพื่อจองห้อง
-      </button>
-    </form>
+  <!-- Login Modal -->
+  <div id="loginModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-chula-darkCard max-w-md w-full p-6 rounded-2xl shadow-2xl relative">
+      <button onclick="closeLoginModal()" class="absolute right-4 top-4 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
+      <h2 class="text-xl font-bold text-center text-chula-main dark:text-red-400 mb-2">
+        <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
+      </h2>
+      <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
+        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิตลงท้าย 21)
+      </p>
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium mb-1">อีเมลนิสิต</label>
+          <input type="email" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th"
+            class="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-chula-main outline-none text-sm">
+        </div>
+        <p id="loginError" class="text-xs text-red-500 hidden"></p>
+        <button type="submit" class="w-full py-2.5 bg-chula-main hover:bg-chula-hover text-white font-medium rounded-lg shadow transition text-sm">
+          เข้าสู่ระบบ
+        </button>
+      </form>
+    </div>
   </div>
 
-  <!-- Main Content App Area -->
-  <main id="appSection" class="hidden max-w-6xl mx-auto px-4 py-6 space-y-6">
+  <!-- Main Container -->
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
 
-    <!-- Status Legend Header -->
-    <div class="bg-white dark:bg-chula-darkCard p-4 rounded-xl shadow-sm flex flex-wrap gap-4 items-center justify-between text-sm">
-      <div class="font-bold flex items-center space-x-2">
-        <i class="fa-solid fa-circle-info text-chula-main"></i>
-        <span>สถานะห้อง:</span>
-      </div>
-      <div class="flex flex-wrap gap-4 text-xs font-medium">
-        <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500"></span><span>ว่าง (Available)</span></span>
-        <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-amber-400"></span><span>รอการยืนยัน (Pending)</span></span>
-        <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-red-500"></span><span>ไม่ว่าง (Occupied)</span></span>
-        <span class="flex items-center space-x-1.5"><span class="w-3 h-3 rounded-full bg-pink-400"></span><span>แชร์ร่วมกันได้ (Shareable)</span></span>
-      </div>
-    </div>
-
-    <!-- Search Bar & Date Selector -->
+    <!-- Search & Date Selection Header -->
     <div class="bg-white dark:bg-chula-darkCard p-4 rounded-xl shadow-sm space-y-4">
-      <!-- Search ID -->
       <div class="flex flex-col md:flex-row gap-2">
         <div class="relative flex-1">
           <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-gray-400"></i>
           <input type="text" id="searchStudentId" placeholder="เช็คห้องที่จองด้วยรหัสนิสิต 10 หลัก" maxlength="10"
-            class="w-full pl-10 pr-4 py-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700 outline-none focus:ring-2 focus:ring-chula-main">
+            class="w-full pl-10 pr-4 py-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700 outline-none focus:ring-2 focus:ring-chula-main text-sm">
         </div>
-        <button onclick="searchBooking()" class="px-6 py-2.5 bg-chula-main text-white font-medium rounded-lg hover:bg-chula-hover transition">
+        <button onclick="searchBooking()" class="px-6 py-2.5 bg-chula-main text-white font-medium rounded-lg hover:bg-chula-hover transition text-sm">
           ค้นหา
         </button>
       </div>
 
-      <!-- Date Selection Tabs -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
         <button id="btnDateToday" onclick="selectDate('today')" class="py-2 px-4 rounded-lg font-medium border text-center transition">
           วันนี้ <br><span id="labelDateToday" class="text-xs font-normal"></span>
@@ -152,9 +164,35 @@
       <div id="libraryStatusBanner" class="text-xs text-center font-semibold py-1 px-3 rounded-md"></div>
     </div>
 
-    <!-- Page 1: Room List View -->
+    <!-- Real-time Overview Room Status Grid (Image-Matching UI) -->
+    <div class="bg-slate-900 text-white p-5 rounded-2xl shadow-lg space-y-4 border border-slate-800">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center space-x-2 text-base font-bold">
+          <i class="fa-solid fa-chart-simple text-red-500"></i>
+          <span>สถานะห้องตอนนี้ (Real-time Overview)</span>
+        </div>
+        <div class="flex flex-wrap gap-2 text-xs font-semibold">
+          <span class="px-3 py-1 rounded-full border border-emerald-500 bg-emerald-950/60 text-emerald-400 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> ว่าง
+          </span>
+          <span class="px-3 py-1 rounded-full border border-amber-500 bg-amber-950/60 text-amber-400 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-amber-400"></span> รอการยืนยัน
+          </span>
+          <span class="px-3 py-1 rounded-full border border-red-500 bg-red-950/60 text-red-400 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-red-400"></span> ไม่ว่าง
+          </span>
+          <span class="px-3 py-1 rounded-full border border-pink-500 bg-pink-950/60 text-pink-400 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-pink-400"></span> แชร์ร่วมกันได้
+          </span>
+        </div>
+      </div>
+
+      <!-- Real-time Cards Grid Container -->
+      <div id="realtimeOverviewGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
+    </div>
+
+    <!-- Page 1: Accordion Room List -->
     <div id="pageRoomList" class="space-y-4">
-      <!-- Accordion: Seminar Room -->
       <div class="bg-white dark:bg-chula-darkCard rounded-xl shadow-sm overflow-hidden border border-gray-200 dark:border-gray-800">
         <button onclick="toggleAccordion('seminarRooms')" class="w-full p-4 bg-chula-main text-white text-left font-bold flex justify-between items-center">
           <span>Seminar Room ชั้น 3</span>
@@ -163,7 +201,6 @@
         <div id="seminarRooms" class="divide-y dark:divide-gray-800"></div>
       </div>
 
-      <!-- Accordion: Study Room -->
       <div class="bg-white dark:bg-chula-darkCard rounded-xl shadow-sm overflow-hidden border border-gray-200 dark:border-gray-800">
         <button onclick="toggleAccordion('studyRooms')" class="w-full p-4 bg-chula-main text-white text-left font-bold flex justify-between items-center">
           <span>Study Room ชั้น 4 (1 - 7)</span>
@@ -172,7 +209,6 @@
         <div id="studyRooms" class="divide-y dark:divide-gray-800"></div>
       </div>
 
-      <!-- Accordion: The Box -->
       <div class="bg-white dark:bg-chula-darkCard rounded-xl shadow-sm overflow-hidden border border-gray-200 dark:border-gray-800">
         <button onclick="toggleAccordion('boxRooms')" class="w-full p-4 bg-chula-main text-white text-left font-bold flex justify-between items-center">
           <span>The Box (A - F)</span>
@@ -182,7 +218,7 @@
       </div>
     </div>
 
-    <!-- Page 2: Time Slot Selector View -->
+    <!-- Page 2: 15-Min Time Slot Selector -->
     <div id="pageTimeSlots" class="hidden space-y-4">
       <div class="flex items-center justify-between">
         <button onclick="showPage('pageRoomList')" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">
@@ -191,14 +227,13 @@
         <h2 id="selectedRoomTitle" class="text-lg font-bold text-chula-main dark:text-red-400"></h2>
       </div>
 
-      <!-- 15-Minute Grid Slot Container -->
       <div class="bg-white dark:bg-chula-darkCard p-6 rounded-xl shadow-sm">
         <h3 class="text-sm font-medium mb-4 text-gray-500 dark:text-gray-400">เลือกรอบเวลาที่ต้องการจอง (ช่องละ 15 นาที)</h3>
         <div id="timeSlotsGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
       </div>
     </div>
 
-    <!-- Page 3: Booking Form View -->
+    <!-- Page 3: Booking Form -->
     <div id="pageBookingForm" class="hidden space-y-4">
       <button onclick="showPage('pageTimeSlots')" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">
         <i class="fa-solid fa-arrow-left mr-1"></i> กลับไปเลือกเวลา
@@ -210,68 +245,71 @@
       </div>
 
       <form onsubmit="submitBooking(event)" class="bg-white dark:bg-chula-darkCard p-6 rounded-xl shadow-sm space-y-6">
-        <!-- Section: User Name -->
         <div>
-          <h4 class="font-bold border-b pb-2 mb-3">ข้อมูลผู้จอง</h4>
-          <label class="block text-sm mb-1">ชื่อผู้จอง (ชื่อจริงหรือชื่อเล่น)</label>
+          <h4 class="font-bold border-b pb-2 mb-3 text-sm">ข้อมูลผู้จอง</h4>
+          <label class="block text-xs mb-1">ชื่อผู้จอง (ชื่อจริงหรือชื่อเล่น)</label>
           <input type="text" id="bookerName" required placeholder="ชื่อจริงหรือชื่อเล่น"
-            class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700 outline-none">
+            class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700 outline-none text-sm">
         </div>
 
-        <!-- Section: Room & Date Locks -->
+        <!-- Private vs Shareable Option -->
         <div>
-          <h4 class="font-bold border-b pb-2 mb-3">วันที่และห้อง</h4>
+          <h4 class="font-bold border-b pb-2 mb-3 text-sm">รูปแบบการใช้งานห้อง</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="p-3 border rounded-xl flex items-start space-x-3 cursor-pointer hover:border-chula-main transition">
+              <input type="radio" name="roomUsageType" value="private" checked class="mt-1 text-chula-main focus:ring-chula-main">
+              <div>
+                <span class="font-bold text-sm block">🔒 ห้องส่วนตัว (เฉพาะกลุ่มเพื่อน)</span>
+                <span class="text-xs text-gray-500 block">สถานะจะขึ้นสีแดง (ไม่ว่าง)</span>
+              </div>
+            </label>
+
+            <label class="p-3 border rounded-xl flex items-start space-x-3 cursor-pointer hover:border-pink-500 transition">
+              <input type="radio" name="roomUsageType" value="shareable" class="mt-1 text-pink-500 focus:ring-pink-500">
+              <div>
+                <span class="font-bold text-sm block text-pink-600 dark:text-pink-400">🤝 แชร์ร่วมกันได้ (Shareable)</span>
+                <span class="text-xs text-gray-500 block">สถานะจะขึ้นสีชมพู (ต้อนรับเพื่อนร่วมห้องเพิ่ม)</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="font-bold border-b pb-2 mb-3 text-sm">วันที่และห้อง</h4>
           <div class="space-y-3">
-            <div>
-              <label class="block text-xs text-gray-500 mb-1">วันที่จอง</label>
-              <input type="text" id="formDateDisplay" disabled class="w-full p-2.5 bg-gray-100 dark:bg-gray-800 border rounded-lg text-sm">
-            </div>
-            <div>
-              <label class="block text-xs text-gray-500 mb-1">ห้องที่เลือก</label>
-              <input type="text" id="formRoomDisplay" disabled class="w-full p-2.5 bg-gray-100 dark:bg-gray-800 border rounded-lg text-sm">
-            </div>
+            <div><label class="block text-xs text-gray-500 mb-1">วันที่จอง</label><input type="text" id="formDateDisplay" disabled class="w-full p-2.5 bg-gray-100 dark:bg-gray-800 border rounded-lg text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">ห้องที่เลือก</label><input type="text" id="formRoomDisplay" disabled class="w-full p-2.5 bg-gray-100 dark:bg-gray-800 border rounded-lg text-sm"></div>
           </div>
         </div>
 
-        <!-- Section: Student IDs (6 slots) -->
         <div>
-          <h4 class="font-bold border-b pb-2 mb-3">กรอกรหัสนิสิต (สูงสุด 6 คน)</h4>
+          <h4 class="font-bold border-b pb-2 mb-3 text-sm">กรอกรหัสนิสิต (สูงสุด 6 คน)</h4>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs text-gray-500 mb-1">คนแรก (ผู้จอง - Auto Fill)</label>
-              <input type="text" id="studentId1" readonly class="w-full p-2.5 bg-gray-100 dark:bg-gray-800 border rounded-lg font-semibold">
-            </div>
-            <div><label class="block text-xs text-gray-500 mb-1">คนที่ 2</label><input type="text" id="studentId2" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700"></div>
-            <div><label class="block text-xs text-gray-500 mb-1">คนที่ 3</label><input type="text" id="studentId3" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700"></div>
-            <div><label class="block text-xs text-gray-500 mb-1">คนที่ 4</label><input type="text" id="studentId4" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700"></div>
-            <div><label class="block text-xs text-gray-500 mb-1">คนที่ 5</label><input type="text" id="studentId5" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700"></div>
-            <div><label class="block text-xs text-gray-500 mb-1">คนที่ 6</label><input type="text" id="studentId6" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">คนแรก (ผู้จอง - Auto Fill)</label><input type="text" id="studentId1" readonly class="w-full p-2.5 bg-gray-100 dark:bg-gray-800 border rounded-lg font-semibold text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">คนที่ 2</label><input type="text" id="studentId2" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700 text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">คนที่ 3</label><input type="text" id="studentId3" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700 text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">คนที่ 4</label><input type="text" id="studentId4" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700 text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">คนที่ 5</label><input type="text" id="studentId5" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700 text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">คนที่ 6</label><input type="text" id="studentId6" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700 text-sm"></div>
           </div>
         </div>
 
-        <!-- Section: Booking Duration Time Selection -->
         <div>
-          <h4 class="font-bold border-b pb-2 mb-3">เวลาที่จอง (สูงสุด 2 ชั่วโมง)</h4>
+          <h4 class="font-bold border-b pb-2 mb-3 text-sm">เวลาที่จอง (สูงสุด 2 ชั่วโมง)</h4>
           <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs text-gray-500 mb-1">เวลาเริ่ม</label>
-              <input type="text" id="startTimeDisplay" disabled class="w-full p-2.5 bg-gray-100 dark:bg-gray-800 border rounded-lg font-semibold">
-            </div>
-            <div>
-              <label class="block text-xs text-gray-500 mb-1">เวลาสิ้นสุด</label>
-              <select id="endTimeSelect" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700 font-semibold"></select>
-            </div>
+            <div><label class="block text-xs text-gray-500 mb-1">เวลาเริ่ม</label><input type="text" id="startTimeDisplay" disabled class="w-full p-2.5 bg-gray-100 dark:bg-gray-800 border rounded-lg font-semibold text-sm"></div>
+            <div><label class="block text-xs text-gray-500 mb-1">เวลาสิ้นสุด</label><select id="endTimeSelect" class="w-full p-2.5 border rounded-lg dark:bg-gray-800 dark:border-gray-700 font-semibold text-sm"></select></div>
           </div>
         </div>
 
-        <button type="submit" class="w-full py-3 bg-chula-main hover:bg-chula-hover text-white font-bold rounded-lg shadow-md transition">
+        <button type="submit" class="w-full py-3 bg-chula-main hover:bg-chula-hover text-white font-bold rounded-lg shadow-md transition text-sm">
           ยืนยันการจอง
         </button>
       </form>
     </div>
 
-    <!-- Search / Queue Result Modal -->
-    <div id="modalOverlay" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <!-- Modal for Search and Confirmation Dialogs -->
+    <div id="modalOverlay" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div class="bg-white dark:bg-chula-darkCard rounded-xl max-w-lg w-full p-6 shadow-2xl relative">
         <button onclick="closeModal()" class="absolute right-4 top-4 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
         <div id="modalContent"></div>
@@ -279,51 +317,59 @@
     </div>
   </main>
 
-  <!-- Application Logic JavaScript -->
   <script>
-    // Room Master Data Definition
-    const ROOM_DATA = {
-      seminar: [
-        { id: 'sem_a', name: 'Seminar Room A', category: 'Seminar Room ชั้น 3' },
-        { id: 'sem_b', name: 'Seminar Room B', category: 'Seminar Room ชั้น 3' },
-        { id: 'sem_c', name: 'Seminar Room C', category: 'Seminar Room ชั้น 3' }
-      ],
-      study: Array.from({ length: 7 }, (_, i) => ({ id: `study_${i+1}`, name: `Study Room ${i+1}`, category: 'Study Room ชั้น 4' })),
-      box: ['A', 'B', 'C', 'D', 'E', 'F'].map(letter => ({ id: `box_${letter}`, name: `The Box ${letter}`, category: 'The Box' }))
-    };
+    const ALL_ROOMS = [
+      { id: 'sem_a', name: 'Seminar Room A', category: 'Seminar Room' },
+      { id: 'sem_b', name: 'Seminar Room B', category: 'Seminar Room' },
+      { id: 'sem_c', name: 'Seminar Room C', category: 'Seminar Room' },
+      ...Array.from({ length: 7 }, (_, i) => ({ id: `study_${i+1}`, name: `Study Room ${i+1}`, category: 'Study Room' })),
+      ...['A', 'B', 'C', 'D', 'E', 'F'].map(l => ({ id: `box_${l}`, name: `The Box ${l}`, category: 'The Box' }))
+    ];
 
-    // State Variables
     let currentUser = null;
     let selectedDateStr = new Date().toISOString().split('T')[0];
     let selectedRoom = null;
     let selectedStartTime = null;
     let realTimeBookings = [];
+    let realTimeRequests = [];
 
-    // Init Theme & Realtime Listener
     document.addEventListener("DOMContentLoaded", () => {
+      checkStoredUserSession();
       initDates();
-      setupFirestoreListener();
+      setupFirestoreListeners();
     });
 
-    // Setup Realtime Synchronization via Firestore
-    function setupFirestoreListener() {
-      db.collection("bookings").onSnapshot((snapshot) => {
-        realTimeBookings = [];
-        snapshot.forEach((doc) => {
-          realTimeBookings.push({ id: doc.id, ...doc.data() });
-        });
-        renderAccordionRooms();
-        if (selectedRoom) renderTimeSlots();
-      });
+    // Restore Persistent Login Session
+    function checkStoredUserSession() {
+      const savedUser = localStorage.getItem('chula_user_session');
+      if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        updateAuthCornerUI(true);
+      } else {
+        updateAuthCornerUI(false);
+      }
     }
 
-    // Login Validation for Chula Engineering Students
+    function updateAuthCornerUI(isLoggedIn) {
+      if (isLoggedIn && currentUser) {
+        document.getElementById('btnLoginCorner').classList.add('hidden');
+        document.getElementById('userInfoCorner').classList.remove('hidden');
+        document.getElementById('userEmailSpan').innerText = currentUser.studentId;
+        document.getElementById('studentId1').value = currentUser.studentId;
+      } else {
+        document.getElementById('btnLoginCorner').classList.remove('hidden');
+        document.getElementById('userInfoCorner').classList.add('hidden');
+      }
+    }
+
+    function openLoginModal() { document.getElementById('loginModal').classList.remove('hidden'); }
+    function closeLoginModal() { document.getElementById('loginModal').classList.add('hidden'); }
+
     function handleLogin(e) {
       e.preventDefault();
       const email = document.getElementById('loginEmail').value.trim().toLowerCase();
       const errEl = document.getElementById('loginError');
 
-      // Check Email Domain
       if (!email.endsWith('@student.chula.ac.th')) {
         errEl.innerText = "❌ กรุณาใช้อีเมลโดเมน @student.chula.ac.th เท่านั้น";
         errEl.classList.remove('hidden');
@@ -332,129 +378,191 @@
 
       const stdId = email.split('@')[0];
       if (stdId.length !== 10) {
-        errEl.innerText = "❌ รหัสนิสิตในอีเมลต้องมี 10 หลัก";
+        errEl.innerText = "❌ รหัสนิสิตต้องมี 10 หลัก";
         errEl.classList.remove('hidden');
         return;
       }
 
-      // Check Academic Year prefix (Current year 2569 -> 66, 67, 68, 69)
       const yearPrefix = parseInt(stdId.substring(0, 2));
-      const currentBE = 69; // 2569
-      if (yearPrefix < (currentBE - 3) || yearPrefix > currentBE) {
-        errEl.innerText = `❌ รหัสนิสิตต้องขึ้นต้นด้วย 66 ถึง 69 เท่านั้น (ปีปัจจุบัน 2569)`;
+      if (yearPrefix < 66 || yearPrefix > 69) {
+        errEl.innerText = "❌ รหัสนิสิตต้องขึ้นต้นด้วย 66 ถึง 69";
         errEl.classList.remove('hidden');
         return;
       }
 
-      // Check Faculty Code 21 (Engineering)
       if (!stdId.endsWith('21')) {
-        errEl.innerText = "❌ สงวนสิทธิ์เฉพาะนิสิตคณะวิศวกรรมศาสตร์ (รหัสลงท้ายด้วย 21)";
+        errEl.innerText = "❌ สงวนสิทธิ์เฉพาะนิสิตวิศวะ (รหัสลงท้ายด้วย 21)";
         errEl.classList.remove('hidden');
         return;
       }
 
-      // Login Successful
       currentUser = { email, studentId: stdId };
-      document.getElementById('loginSection').classList.add('hidden');
-      document.getElementById('appSection').classList.remove('hidden');
-      document.getElementById('userInfoHeader').classList.remove('hidden');
-      document.getElementById('userEmailSpan').innerText = stdId;
-      document.getElementById('studentId1').value = stdId;
+      localStorage.setItem('chula_user_session', JSON.stringify(currentUser));
+      updateAuthCornerUI(true);
+      closeLoginModal();
     }
 
     function logout() {
       currentUser = null;
-      document.getElementById('loginSection').classList.remove('hidden');
-      document.getElementById('appSection').classList.add('hidden');
-      document.getElementById('userInfoHeader').classList.add('hidden');
+      localStorage.removeItem('chula_user_session');
+      updateAuthCornerUI(false);
     }
 
-    // Theme Switcher
     function toggleTheme() {
       const isDark = document.documentElement.classList.toggle('dark');
       document.getElementById('themeIcon').className = isDark ? 'fa-solid fa-sun text-yellow-400 text-lg' : 'fa-solid fa-moon text-lg';
     }
 
-    // Date Management
-    function initDates() {
-      const today = new Date();
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+    function setupFirestoreListeners() {
+      // Listen Bookings
+      db.collection("bookings").onSnapshot(snapshot => {
+        realTimeBookings = [];
+        snapshot.forEach(doc => realTimeBookings.push({ id: doc.id, ...doc.data() }));
+        renderAllOverviewGrids();
+      });
 
-      document.getElementById('labelDateToday').innerText = formatDateTh(today);
-      document.getElementById('labelDateTomorrow').innerText = formatDateTh(tomorrow);
-      document.getElementById('btnDateToday').setAttribute('data-date', formatDateISO(today));
-      document.getElementById('btnDateTomorrow').setAttribute('data-date', formatDateISO(tomorrow));
-
-      selectDate('today');
+      // Listen Queue Requests
+      db.collection("queue_requests").onSnapshot(snapshot => {
+        realTimeRequests = [];
+        snapshot.forEach(doc => realTimeRequests.push({ id: doc.id, ...doc.data() }));
+        updateNotificationBellHub();
+      });
     }
 
-    function selectDate(type) {
-      const todayStr = formatDateISO(new Date());
-      const tomorrowStr = formatDateISO(new Date(Date.now() + 86400000));
+    // Notification Hub Bell Logic
+    function updateNotificationBellHub() {
+      if (!currentUser) return;
 
-      if (type === 'today') selectedDateStr = todayStr;
-      else if (type === 'tomorrow') selectedDateStr = tomorrowStr;
-      else if (type === 'custom') selectedDateStr = document.getElementById('customDatePicker').value;
+      // Find requests for bookings owned by current logged in user
+      const myBookings = realTimeBookings.filter(b => b.bookerEmail === currentUser.email);
+      const incomingReqs = realTimeRequests.filter(r => 
+        myBookings.some(b => b.roomId === r.roomId && b.date === r.date && r.timeSlot >= b.startTime && r.timeSlot < b.endTime)
+        && r.status === 'pending'
+      );
 
-      // Update UI Active Date Buttons
-      document.getElementById('btnDateToday').className = `py-2 px-4 rounded-lg font-medium border text-center transition ${selectedDateStr === todayStr ? 'bg-chula-main text-white border-chula-main' : 'bg-gray-50 dark:bg-gray-800'}`;
-      document.getElementById('btnDateTomorrow').className = `py-2 px-4 rounded-lg font-medium border text-center transition ${selectedDateStr === tomorrowStr ? 'bg-chula-main text-white border-chula-main' : 'bg-gray-50 dark:bg-gray-800'}`;
-      
-      updateLibraryOpeningHoursStatus();
+      // Also get status updates for requests submitted BY the current user
+      const mySubmittedReqs = realTimeRequests.filter(r => r.requesterEmail === currentUser.email && r.status !== 'pending');
+
+      const totalBadgeCount = incomingReqs.length + mySubmittedReqs.length;
+      const badge = document.getElementById('notiBadge');
+      const countLabel = document.getElementById('notiCountLabel');
+
+      if (totalBadgeCount > 0) {
+        badge.innerText = totalBadgeCount;
+        badge.classList.remove('hidden');
+        countLabel.innerText = `${totalBadgeCount} รายการใหม่`;
+      } else {
+        badge.classList.add('hidden');
+        countLabel.innerText = "0";
+      }
+
+      const listEl = document.getElementById('notiList');
+      if (incomingReqs.length === 0 && mySubmittedReqs.length === 0) {
+        listEl.innerHTML = `<p class="text-center text-gray-400 py-3">ไม่มีคำขอที่ค้างอยู่</p>`;
+        return;
+      }
+
+      let html = '';
+      incomingReqs.forEach(req => {
+        html += `
+          <div class="py-2 space-y-1">
+            <div class="font-bold text-chula-main">📩 คำขอคิวห้อง: ${req.roomName}</div>
+            <div>เวลา ${req.timeSlot} น. (${req.date})</div>
+            <div class="text-gray-500">ผู้ขอ: ${req.requesterEmail}</div>
+            <div class="italic text-gray-400">"${req.message || '-'}"</div>
+            <div class="flex space-x-2 pt-1">
+              <button onclick="respondQueueRequest('${req.id}', 'approved')" class="px-2.5 py-1 bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700">อนุมัติ</button>
+              <button onclick="respondQueueRequest('${req.id}', 'rejected')" class="px-2.5 py-1 bg-red-600 text-white rounded font-bold hover:bg-red-700">ไม่อนุมัติ</button>
+            </div>
+          </div>
+        `;
+      });
+
+      mySubmittedReqs.forEach(req => {
+        const isApproved = req.status === 'approved';
+        html += `
+          <div class="py-2 space-y-1">
+            <div class="font-bold ${isApproved ? 'text-emerald-500' : 'text-red-500'}">
+              ${isApproved ? '✅ คำขอสละสิทธิ์ได้รับการอนุมัติแล้ว!' : '❌ คำขอสละสิทธิ์ถูกปฏิเสธ'}
+            </div>
+            <div>ห้อง ${req.roomName} | ${req.date} (${req.timeSlot} น.)</div>
+          </div>
+        `;
+      });
+
+      listEl.innerHTML = html;
+    }
+
+    async function respondQueueRequest(reqId, status) {
+      await db.collection("queue_requests").doc(reqId).update({ status });
+      alert(status === 'approved' ? 'อนุมัติคำขอสละสิทธิ์คิวเรียบร้อย' : 'ปฏิเสธคำขอสละสิทธิ์คิวเรียบร้อย');
+    }
+
+    function toggleNotiDropdown() {
+      document.getElementById('notiDropdown').classList.toggle('hidden');
+    }
+
+    // Render Realtime Overview Grid (Matching User Screenshot UI)
+    function renderAllOverviewGrids() {
+      renderRealtimeOverviewGrid();
       renderAccordionRooms();
       if (selectedRoom) renderTimeSlots();
     }
 
-    function updateLibraryOpeningHoursStatus() {
-      const dateObj = new Date(selectedDateStr);
-      const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-      const closingTimeStr = isWeekend ? "17:00" : "19:00";
+    function renderRealtimeOverviewGrid() {
+      const grid = document.getElementById('realtimeOverviewGrid');
+      grid.innerHTML = ALL_ROOMS.map(room => {
+        const status = getRoomOverallStatus(room.id, selectedDateStr);
+        let colorClasses = "";
 
-      const banner = document.getElementById('libraryStatusBanner');
-      banner.innerText = `🕒 เวลาทำการวันที่เลือก: ${isWeekend ? 'เสาร์-อาทิตย์ (ปิด 17:00 น.)' : 'จันทร์-ศุกร์ (ปิด 19:00 น.)'}`;
-      banner.className = `text-xs text-center font-semibold py-1.5 px-3 rounded-md ${isWeekend ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'}`;
+        if (status === 'ว่าง') colorClasses = "bg-emerald-950/70 border-emerald-500 text-emerald-300";
+        else if (status === 'รอการยืนยัน') colorClasses = "bg-amber-950/70 border-amber-500 text-amber-300";
+        else if (status === 'แชร์ร่วมกันได้') colorClasses = "bg-pink-950/70 border-pink-500 text-pink-300";
+        else colorClasses = "bg-red-950/70 border-red-500 text-red-300";
+
+        return `
+          <div onclick="openRoomTimeSlots('${room.id}', '${room.name}')" 
+            class="p-3 border-2 rounded-xl text-center cursor-pointer hover:scale-105 transition transform flex flex-col justify-center items-center h-20 ${colorClasses}">
+            <div class="font-bold text-xs sm:text-sm truncate w-full">${room.name}</div>
+            <div class="text-[11px] font-semibold mt-1">${status}</div>
+          </div>
+        `;
+      }).join('');
     }
 
-    // Render Rooms in Accordion
+    function getRoomOverallStatus(roomId, dateStr) {
+      const roomBookings = realTimeBookings.filter(b => b.roomId === roomId && b.date === dateStr);
+      if (roomBookings.length === 0) return 'ว่าง';
+      if (roomBookings.some(b => b.status === 'pending')) return 'รอการยืนยัน';
+      if (roomBookings.some(b => b.isShareable)) return 'แชร์ร่วมกันได้';
+      return 'ไม่ว่าง';
+    }
+
     function renderAccordionRooms() {
-      renderRoomCategory('seminarRooms', ROOM_DATA.seminar);
-      renderRoomCategory('studyRooms', ROOM_DATA.study);
-      renderRoomCategory('boxRooms', ROOM_DATA.box);
+      renderCategory('seminarRooms', ALL_ROOMS.filter(r => r.category === 'Seminar Room'));
+      renderCategory('studyRooms', ALL_ROOMS.filter(r => r.category === 'Study Room'));
+      renderCategory('boxRooms', ALL_ROOMS.filter(r => r.category === 'The Box'));
     }
 
-    function renderRoomCategory(containerId, rooms) {
+    function renderCategory(containerId, rooms) {
       const container = document.getElementById(containerId);
       container.innerHTML = rooms.map(room => {
-        const statusInfo = calculateRoomStatus(room.id, selectedDateStr);
+        const st = getRoomOverallStatus(room.id, selectedDateStr);
+        let badgeColor = st === 'ว่าง' ? 'bg-emerald-500' : (st === 'รอการยืนยัน' ? 'bg-amber-400' : (st === 'แชร์ร่วมกันได้' ? 'bg-pink-400' : 'bg-red-500'));
         return `
           <div class="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
             <div class="flex items-center space-x-3">
-              <span class="w-3 h-3 rounded-full ${statusInfo.badgeClass}"></span>
-              <div>
-                <span class="font-bold text-gray-800 dark:text-gray-200">${room.name}</span>
-                <span class="text-xs text-gray-500 ml-2">(${statusInfo.statusText})</span>
-              </div>
+              <span class="w-3 h-3 rounded-full ${badgeColor}"></span>
+              <span class="font-bold text-sm">${room.name} <span class="text-xs text-gray-500 font-normal">(${st})</span></span>
             </div>
-            <button onclick="openRoomTimeSlots('${room.id}', '${room.name}')" 
-              class="text-chula-main dark:text-red-400 hover:underline font-semibold text-sm flex items-center space-x-1">
-              <span>จองออนไลน์</span>
-              <i class="fa-solid fa-chevron-right text-xs"></i>
+            <button onclick="openRoomTimeSlots('${room.id}', '${room.name}')" class="text-chula-main dark:text-red-400 font-bold text-xs flex items-center space-x-1">
+              <span>จองออนไลน์</span><i class="fa-solid fa-chevron-right text-[10px]"></i>
             </button>
           </div>
         `;
       }).join('');
     }
 
-    function calculateRoomStatus(roomId, dateStr) {
-      const roomBookings = realTimeBookings.filter(b => b.roomId === roomId && b.date === dateStr);
-      if (roomBookings.length === 0) return { statusText: 'ว่าง', badgeClass: 'bg-emerald-500' };
-      if (roomBookings.some(b => b.status === 'pending')) return { statusText: 'รอการยืนยัน', badgeClass: 'bg-amber-400' };
-      if (roomBookings.some(b => b.isShareable)) return { statusText: 'แชร์ร่วมกันได้', badgeClass: 'bg-pink-400' };
-      return { statusText: 'ไม่ว่าง', badgeClass: 'bg-red-500' };
-    }
-
-    // Open Time Slots Page
     function openRoomTimeSlots(roomId, roomName) {
       selectedRoom = { id: roomId, name: roomName };
       document.getElementById('selectedRoomTitle').innerText = roomName;
@@ -462,7 +570,6 @@
       renderTimeSlots();
     }
 
-    // Render 15-Minute Grid Time Slots
     function renderTimeSlots() {
       const grid = document.getElementById('timeSlotsGrid');
       grid.innerHTML = '';
@@ -470,235 +577,209 @@
       const dateObj = new Date(selectedDateStr);
       const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
       const closingTimeStr = isWeekend ? "17:00" : "19:00";
-
       const now = new Date();
       const isToday = selectedDateStr === formatDateISO(now);
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-      // Time Grid: 09:00 until Closing Time (Max Start Time = Closing Time - 15 mins)
-      let timeSlots = [];
-      let startMins = 9 * 60; // 09:00
-      let [closeHour, closeMin] = closingTimeStr.split(':').map(Number);
-      let endMins = closeHour * 60 + closeMin;
+      let startMins = 9 * 60;
+      let [ch, cm] = closingTimeStr.split(':').map(Number);
+      let endMins = ch * 60 + cm;
 
       for (let m = startMins; m < endMins; m += 15) {
         const hh = String(Math.floor(m / 60)).padStart(2, '0');
         const mm = String(m % 60).padStart(2, '0');
-        timeSlots.push(`${hh}:${mm}`);
-      }
+        const time = `${hh}:${mm}`;
 
-      timeSlots.forEach(time => {
-        const [h, min] = time.split(':').map(Number);
-        const slotMinutes = h * 60 + min;
+        const isPast = isToday && (m <= currentMinutes);
+        const booked = realTimeBookings.find(b => b.roomId === selectedRoom.id && b.date === selectedDateStr && time >= b.startTime && time < b.endTime);
 
-        const isPastTime = isToday && (slotMinutes <= currentMinutes);
-        const isBooked = isTimeSlotBooked(selectedRoom.id, selectedDateStr, time);
+        let btnStyle = "";
+        let action = "";
+        let label = "";
 
-        let btnClass = "";
-        let actionAttr = "";
-        let labelExtra = "";
-
-        if (isPastTime) {
-          btnClass = "bg-gray-200 text-gray-400 dark:bg-gray-800 dark:text-gray-600 cursor-not-allowed border-transparent";
-          labelExtra = `<span class="text-[10px] block text-gray-400">เลยเวลา</span>`;
-        } else if (isBooked) {
-          btnClass = "bg-gray-300 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border-gray-400 hover:bg-red-100 hover:text-red-700 transition";
-          actionAttr = `onclick="promptQueueRequest('${time}')"`;
-          labelExtra = `<span class="text-[10px] block text-red-500 font-semibold">จองแล้ว (ขอคิว)</span>`;
+        if (isPast) {
+          btnStyle = "bg-gray-200 text-gray-400 border-transparent cursor-not-allowed dark:bg-gray-800 dark:text-gray-600";
+          label = `<span class="text-[10px] block text-gray-400">เลยเวลา</span>`;
+        } else if (booked) {
+          if (booked.isShareable) {
+            btnStyle = "bg-pink-100 text-pink-700 border-pink-400 hover:bg-pink-200 dark:bg-pink-950/60 dark:text-pink-300 font-bold";
+            action = `onclick="selectTimeSlotForBooking('${time}')"`;
+            label = `<span class="text-[10px] block text-pink-600">แชร์ได้ (จองร่วม)</span>`;
+          } else {
+            btnStyle = "bg-gray-300 text-gray-600 border-gray-400 hover:bg-red-100 hover:text-red-700 dark:bg-gray-700 dark:text-gray-400";
+            action = `onclick="promptQueue('${time}')"`;
+            label = `<span class="text-[10px] block text-red-500 font-semibold">จองแล้ว (ขอคิว)</span>`;
+          }
         } else {
-          btnClass = "bg-white dark:bg-gray-800 text-gray-800 dark:text-white border-gray-300 dark:border-gray-700 hover:border-chula-main hover:text-chula-main font-bold shadow-sm";
-          actionAttr = `onclick="selectTimeSlotForBooking('${time}')"`;
+          btnStyle = "bg-white text-gray-800 border-gray-300 hover:border-chula-main hover:text-chula-main dark:bg-gray-800 dark:text-white dark:border-gray-700 font-bold shadow-sm";
+          action = `onclick="selectTimeSlotForBooking('${time}')"`;
         }
 
         grid.innerHTML += `
-          <button ${actionAttr} class="p-3 border rounded-xl text-center transition flex flex-col items-center justify-center ${btnClass}">
-            <span class="text-base">${time}</span>
-            ${labelExtra}
+          <button ${action} class="p-3 border rounded-xl text-center transition flex flex-col items-center justify-center ${btnStyle}">
+            <span class="text-base">${time}</span>${label}
           </button>
         `;
-      });
+      }
     }
 
-    function isTimeSlotBooked(roomId, dateStr, timeStr) {
-      return realTimeBookings.some(b => {
-        if (b.roomId !== roomId || b.date !== dateStr) return false;
-        return timeStr >= b.startTime && timeStr < b.endTime;
-      });
-    }
-
-    // Select Slot & Go to Booking Form
     function selectTimeSlotForBooking(startTime) {
+      if (!currentUser) {
+        openLoginModal();
+        return;
+      }
       selectedStartTime = startTime;
       document.getElementById('formDateDisplay').value = selectedDateStr;
       document.getElementById('formRoomDisplay').value = selectedRoom.name;
       document.getElementById('startTimeDisplay').value = `${startTime} น.`;
 
-      // Calculate Max End Time Options (Max 2 Hours & Not exceed closing time)
       const selectEnd = document.getElementById('endTimeSelect');
       selectEnd.innerHTML = '';
-
       const [sh, sm] = startTime.split(':').map(Number);
-      const startMinutes = sh * 60 + sm;
+      const startMins = sh * 60 + sm;
+      const isWeekend = new Date(selectedDateStr).getDay() % 6 === 0;
+      const maxEndMins = Math.min(startMins + 120, isWeekend ? 17 * 60 : 19 * 60);
 
-      const dateObj = new Date(selectedDateStr);
-      const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-      const maxClosingMinutes = isWeekend ? 17 * 60 : 19 * 60; // 17:00 or 19:00
-
-      // Max duration = 2 hours = 120 minutes
-      const maxEndMinutes = Math.min(startMinutes + 120, maxClosingMinutes);
-
-      for (let m = startMinutes + 15; m <= maxEndMinutes; m += 15) {
+      for (let m = startMins + 15; m <= maxEndMins; m += 15) {
         const hh = String(Math.floor(m / 60)).padStart(2, '0');
         const mm = String(m % 60).padStart(2, '0');
-        const timeStr = `${hh}:${mm}`;
-        selectEnd.innerHTML += `<option value="${timeStr}">${timeStr} น.</option>`;
+        selectEnd.innerHTML += `<option value="${hh}:${mm}">${hh}:${mm} น.</option>`;
       }
-
       showPage('pageBookingForm');
     }
 
-    // Submit Booking to Firestore
     async function submitBooking(e) {
       e.preventDefault();
-      const bookerName = document.getElementById('bookerName').value.trim();
-      const endTime = document.getElementById('endTimeSelect').value;
-
-      const students = [
-        currentUser.studentId,
-        document.getElementById('studentId2').value.trim(),
-        document.getElementById('studentId3').value.trim(),
-        document.getElementById('studentId4').value.trim(),
-        document.getElementById('studentId5').value.trim(),
-        document.getElementById('studentId6').value.trim(),
-      ].filter(id => id.length > 0);
+      const usageType = document.querySelector('input[name="roomUsageType"]:checked').value;
+      const isShareable = (usageType === 'shareable');
 
       const newBooking = {
         roomId: selectedRoom.id,
         roomName: selectedRoom.name,
         date: selectedDateStr,
         startTime: selectedStartTime,
-        endTime: endTime,
-        bookerName: bookerName,
+        endTime: document.getElementById('endTimeSelect').value,
+        bookerName: document.getElementById('bookerName').value.trim(),
         bookerEmail: currentUser.email,
-        studentIds: students,
-        status: 'occupied',
+        isShareable: isShareable,
+        status: isShareable ? 'shareable' : 'occupied',
+        studentIds: [
+          currentUser.studentId,
+          document.getElementById('studentId2').value.trim(),
+          document.getElementById('studentId3').value.trim(),
+          document.getElementById('studentId4').value.trim(),
+          document.getElementById('studentId5').value.trim(),
+          document.getElementById('studentId6').value.trim(),
+        ].filter(id => id.length > 0),
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
 
-      try {
-        await db.collection("bookings").add(newBooking);
-        alert('✅ บันทึกการจองสำเร็จแล้ว ข้อมูลถูกอัปเดตแบบ Real-time ข้ามระบบเรียบร้อย!');
-        showPage('pageRoomList');
-      } catch (err) {
-        alert('❌ เกิดข้อผิดพลาดในการบันทึก: ' + err.message);
-      }
+      await db.collection("bookings").add(newBooking);
+      alert('✅ บันทึกการจองสำเร็จแล้ว!');
+      showPage('pageRoomList');
     }
 
-    // Queue / Transfer Request Feature
-    function promptQueueRequest(time) {
+    function promptQueue(time) {
+      if (!currentUser) { openLoginModal(); return; }
       const modal = document.getElementById('modalOverlay');
-      const content = document.getElementById('modalContent');
-
-      content.innerHTML = `
-        <h3 class="text-lg font-bold text-chula-main mb-2"><i class="fa-solid fa-hand-paper mr-2"></i>ยื่นคำขอสละสิทธิ์ / ขอต่อคิว</h3>
-        <p class="text-sm mb-4">ช่วงเวลา <b>${time} น.</b> ในวันที่ <b>${selectedDateStr}</b> ถูกจองไว้แล้ว คุณต้องการยื่นคำขอถึงผู้จองเพื่อขอต่อคิวสละสิทธิ์ใช่หรือไม่?</p>
-        <textarea id="queueMsg" rows="3" placeholder="ระบุข้อความหรือช่องทางติดต่อกลับ (เช่น LINE ID)..." class="w-full p-2 border rounded-lg dark:bg-gray-800 text-sm mb-4 outline-none"></textarea>
+      document.getElementById('modalContent').innerHTML = `
+        <h3 class="text-base font-bold text-chula-main mb-2">ยื่นคำขอสละสิทธิ์คิว</h3>
+        <p class="text-xs mb-3">ยื่นคำขอต่อคิวเวลา <b>${time} น.</b> ห้อง <b>${selectedRoom.name}</b></p>
+        <textarea id="qMsg" rows="3" placeholder="ข้อความถึงผู้จอง..." class="w-full p-2 border rounded text-xs dark:bg-gray-800 mb-3"></textarea>
         <div class="flex justify-end space-x-2">
-          <button onclick="closeModal()" class="px-4 py-2 border rounded-lg text-sm">ยกเลิก</button>
-          <button onclick="sendQueueRequest('${time}')" class="px-4 py-2 bg-chula-main text-white rounded-lg text-sm font-semibold">ส่งคำขอ</button>
+          <button onclick="closeModal()" class="px-3 py-1.5 border text-xs rounded">ยกเลิก</button>
+          <button onclick="sendQueue('${time}')" class="px-3 py-1.5 bg-chula-main text-white text-xs rounded font-bold">ส่งคำขอ</button>
         </div>
       `;
       modal.classList.remove('hidden');
     }
 
-    async function sendQueueRequest(time) {
-      const msg = document.getElementById('queueMsg').value;
+    async function sendQueue(time) {
       await db.collection("queue_requests").add({
         roomId: selectedRoom.id,
         roomName: selectedRoom.name,
         date: selectedDateStr,
         timeSlot: time,
         requesterEmail: currentUser.email,
-        message: msg,
+        message: document.getElementById('qMsg').value,
+        status: 'pending',
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      alert('📩 ส่งคำขอสละสิทธิ์เรียบร้อยแล้ว!');
+      alert('📩 ส่งคำขอต่อคิวเรียบร้อยแล้ว!');
       closeModal();
     }
 
-    // Search Booking by Student ID
     async function searchBooking() {
-      const queryId = document.getElementById('searchStudentId').value.trim();
-      if (queryId.length !== 10) {
-        alert('กรุณากรอกรหัสนิสิต 10 หลักให้ถูกต้อง');
-        return;
-      }
-
-      const results = realTimeBookings.filter(b => b.studentIds && b.studentIds.includes(queryId));
+      const q = document.getElementById('searchStudentId').value.trim();
+      if (q.length !== 10) { alert('กรอกรหัสนิสิต 10 หลัก'); return; }
+      const res = realTimeBookings.filter(b => b.studentIds && b.studentIds.includes(q));
       const modal = document.getElementById('modalOverlay');
       const content = document.getElementById('modalContent');
 
-      if (results.length === 0) {
-        content.innerHTML = `
-          <h3 class="text-lg font-bold mb-2">ผลการค้นหา</h3>
-          <p class="text-sm text-gray-500">ไม่พบข้อมูลการจองสำหรับรหัสนิสิต: <b>${queryId}</b></p>
-        `;
-      } else {
-        content.innerHTML = `
-          <h3 class="text-lg font-bold text-chula-main mb-3">ผลการค้นหารหัสนิสิต: ${queryId}</h3>
-          <div class="space-y-3 max-h-80 overflow-y-auto">
-            ${results.map(b => `
-              <div class="p-3 border rounded-lg bg-gray-50 dark:bg-gray-800 flex justify-between items-center text-sm">
+      content.innerHTML = `
+        <h3 class="font-bold text-chula-main mb-3 text-sm">รายการจองของรหัส: ${q}</h3>
+        ${res.length === 0 ? '<p class="text-xs text-gray-500">ไม่พบรายการจอง</p>' : `
+          <div class="space-y-2 max-h-60 overflow-y-auto">
+            ${res.map(b => `
+              <div class="p-2.5 border rounded text-xs flex justify-between items-center bg-gray-50 dark:bg-gray-800">
                 <div>
-                  <div class="font-bold text-chula-main">${b.roomName}</div>
+                  <div class="font-bold">${b.roomName} (${b.isShareable ? '🌸 แชร์ได้' : '🔒 ส่วนตัว'})</div>
                   <div>📅 ${b.date} | 🕒 ${b.startTime} - ${b.endTime} น.</div>
-                  <div class="text-xs text-gray-500">ผู้จอง: ${b.bookerName}</div>
                 </div>
-                <button onclick="cancelBooking('${b.id}')" class="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition">
-                  ยกเลิกจอง
-                </button>
+                <button onclick="cancelBooking('${b.id}')" class="px-2 py-1 bg-red-600 text-white rounded text-[10px]">ยกเลิก</button>
               </div>
             `).join('')}
           </div>
-        `;
-      }
+        `}
+      `;
       modal.classList.remove('hidden');
     }
 
-    async function cancelBooking(docId) {
-      if (!confirm('คุณต้องการยกเลิกการจองนี้ใช่หรือไม่?')) return;
-      try {
-        await db.collection("bookings").doc(docId).delete();
-        alert('🗑️ ยกเลิกการจองสำเร็จแล้ว');
-        closeModal();
-      } catch (err) {
-        alert('เกิดข้อผิดพลาด: ' + err.message);
-      }
+    async function cancelBooking(id) {
+      if (!confirm('ยืนยันยกเลิก?')) return;
+      await db.collection("bookings").doc(id).delete();
+      alert('ยกเลิกเรียบร้อย');
+      closeModal();
     }
 
-    // Helper Utility Functions
-    function showPage(pageId) {
-      ['pageRoomList', 'pageTimeSlots', 'pageBookingForm'].forEach(id => {
-        document.getElementById(id).classList.add('hidden');
-      });
-      document.getElementById(pageId).classList.remove('hidden');
+    function initDates() {
+      const today = new Date();
+      const tmr = new Date(Date.now() + 86400000);
+      document.getElementById('labelDateToday').innerText = formatDateTh(today);
+      document.getElementById('labelDateTomorrow').innerText = formatDateTh(tmr);
+      document.getElementById('btnDateToday').setAttribute('data-date', formatDateISO(today));
+      document.getElementById('btnDateTomorrow').setAttribute('data-date', formatDateISO(tmr));
+      selectDate('today');
+    }
+
+    function selectDate(type) {
+      const todayStr = formatDateISO(new Date());
+      const tmrStr = formatDateISO(new Date(Date.now() + 86400000));
+      if (type === 'today') selectedDateStr = todayStr;
+      else if (type === 'tomorrow') selectedDateStr = tmrStr;
+      else if (type === 'custom') selectedDateStr = document.getElementById('customDatePicker').value;
+
+      document.getElementById('btnDateToday').className = `py-2 px-4 rounded-lg font-medium border text-center transition ${selectedDateStr === todayStr ? 'bg-chula-main text-white border-chula-main' : 'bg-gray-50 dark:bg-gray-800'}`;
+      document.getElementById('btnDateTomorrow').className = `py-2 px-4 rounded-lg font-medium border text-center transition ${selectedDateStr === tmrStr ? 'bg-chula-main text-white border-chula-main' : 'bg-gray-50 dark:bg-gray-800'}`;
+      
+      renderAllOverviewGrids();
+    }
+
+    function showPage(id) {
+      ['pageRoomList', 'pageTimeSlots', 'pageBookingForm'].forEach(p => document.getElementById(p).classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
     }
 
     function toggleAccordion(id) {
-      const el = document.getElementById(id);
-      const icon = document.getElementById(`icon-${id}`);
-      el.classList.toggle('hidden');
-      icon.classList.toggle('rotate-180');
+      document.getElementById(id).classList.toggle('hidden');
+      document.getElementById(`icon-${id}`).classList.toggle('rotate-180');
     }
 
-    function closeModal() {
-      document.getElementById('modalOverlay').classList.add('hidden');
-    }
-
+    function closeModal() { document.getElementById('modalOverlay').classList.add('hidden'); }
     function formatDateISO(d) { return d.toISOString().split('T')[0]; }
     function formatDateTh(d) {
-      const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-      return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
+      const m = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      return `${d.getDate()} ${m[d.getMonth()]} ${d.getFullYear() + 543}`;
     }
   </script>
 </body>
