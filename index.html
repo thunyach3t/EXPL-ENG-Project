@@ -113,6 +113,12 @@
     <!-- Main Content Container -->
     <main class="max-w-5xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-6 flex-grow space-y-5">
 
+        <!-- Real-time Operating Status Banner -->
+        <div id="operating-status-banner" class="hidden rounded-xl p-3 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-sm border">
+            <span id="operating-status-text" class="flex items-center gap-2"></span>
+            <span id="operating-hours-text" class="text-xs font-normal opacity-90"></span>
+        </div>
+
         <!-- Room Real-time Status Overview Grid -->
         <section class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
@@ -170,29 +176,52 @@
                 </form>
             </section>
 
-            <!-- Date Selector Tabs & Last Updated Info -->
-            <section>
-                <div class="grid grid-cols-2 gap-2 sm:gap-3 bg-gray-200 dark:bg-gray-800 p-1.5 rounded-xl shadow-inner text-center font-medium">
-                    <button 
-                        id="tab-today" 
-                        onclick="switchDateTab('today')" 
-                        class="py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 bg-white dark:bg-gray-700 text-chula dark:text-amber-300 shadow font-semibold flex flex-col items-center justify-center"
-                    >
-                        <span class="text-xs text-gray-500 dark:text-gray-300 font-normal">วันนี้</span>
-                        <span id="display-date-today">-- -- ----</span>
-                    </button>
-                    <button 
-                        id="tab-tomorrow" 
-                        onclick="switchDateTab('tomorrow')" 
-                        class="py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-chula flex flex-col items-center justify-center"
-                    >
-                        <span class="text-xs text-gray-400 font-normal">พรุ่งนี้</span>
-                        <span id="display-date-tomorrow">-- -- ----</span>
-                    </button>
+            <!-- Dynamic Date Selector Bar (Today / Tomorrow / Custom Date Picker) -->
+            <section class="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 space-y-3">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
+                        <i class="fa-solid fa-calendar-days text-chula"></i>
+                        <span>เลือกวันที่ต้องการจอง:</span>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <button 
+                            id="tab-today" 
+                            onclick="switchDateTab('today')" 
+                            class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-chula text-white shadow"
+                        >
+                            วันนี้ (<span id="display-date-today-short">--</span>)
+                        </button>
+                        <button 
+                            id="tab-tomorrow" 
+                            onclick="switchDateTab('tomorrow')" 
+                            class="flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
+                        >
+                            พรุ่งนี้ (<span id="display-date-tomorrow-short">--</span>)
+                        </button>
+                        
+                        <!-- Custom Date Picker Field -->
+                        <div class="flex items-center gap-1.5 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 bg-gray-50 dark:bg-gray-900 text-xs sm:text-sm">
+                            <i class="fa-regular fa-calendar text-gray-500"></i>
+                            <input 
+                                type="date" 
+                                id="custom-date-picker" 
+                                onchange="handleCustomDateChange(event)"
+                                class="bg-transparent text-gray-700 dark:text-gray-200 focus:outline-none cursor-pointer"
+                            >
+                        </div>
+                    </div>
                 </div>
-                <div class="text-right text-xs text-gray-500 dark:text-gray-400 mt-2 pr-1 flex items-center justify-end gap-1">
-                    <i class="fa-solid fa-arrows-rotate text-gray-400"></i>
-                    <span>อัปเดตล่าสุด: <span id="last-updated-time">--:-- น.</span></span>
+
+                <div class="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <div>
+                        <span>วันที่เลือกปัจจุบัน: </span>
+                        <span id="selected-date-display-label" class="font-bold text-chula dark:text-amber-300">-- -- ----</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <i class="fa-solid fa-arrows-rotate text-gray-400 animate-spin-slow"></i>
+                        <span>อัปเดตล่าสุด: <span class="last-updated-val">--:-- น.</span></span>
+                    </div>
                 </div>
             </section>
 
@@ -204,21 +233,15 @@
 
         <!-- ================= PAGE 2: TIME SLOTS VIEW (15-MIN INTERVALS) ================= -->
         <div id="page-time-slots" class="hidden space-y-4">
-            <!-- Date Banner Bar -->
-            <div class="grid grid-cols-2 gap-2 sm:gap-3 bg-gray-200 dark:bg-gray-800 p-1.5 rounded-xl text-center font-medium opacity-90 pointer-events-none">
-                <div id="timeslot-date-today" class="py-2.5 px-4 rounded-lg text-xs sm:text-sm text-gray-600 dark:text-gray-300 flex flex-col items-center justify-center">
-                    <span class="text-[10px] text-gray-400">วันนี้</span>
-                    <span id="ts-date-today-val">--</span>
-                </div>
-                <div id="timeslot-date-tomorrow" class="py-2.5 px-4 rounded-lg text-xs sm:text-sm text-gray-600 dark:text-gray-300 flex flex-col items-center justify-center">
-                    <span class="text-[10px] text-gray-400">พรุ่งนี้</span>
-                    <span id="ts-date-tomorrow-val">--</span>
-                </div>
+            <!-- Dynamic Active Date Indicator Bar -->
+            <div class="bg-chula text-white p-3 rounded-xl text-center shadow-sm flex justify-between items-center px-4">
+                <span class="text-xs sm:text-sm font-medium opacity-90"><i class="fa-solid fa-calendar-check mr-1.5"></i>วันที่กำลังจอง:</span>
+                <span id="timeslot-active-date-str" class="text-sm sm:text-base font-bold text-amber-200">-- -- ----</span>
             </div>
 
-            <div class="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400 px-1">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs text-gray-500 dark:text-gray-400 gap-1 px-1">
                 <span id="library-closing-notice" class="text-amber-700 dark:text-amber-400 font-medium">
-                    <i class="fa-solid fa-clock-rotate-left mr-1"></i>เวลาทำการ: จันทร์-ศุกร์ ปิด 19:00 น. | เสาร์-อาทิตย์ ปิด 17:00 น.
+                    <i class="fa-solid fa-clock-rotate-left mr-1"></i>เวลาทำการวันนี้: ปิด --:-- น.
                 </span>
                 <span>อัปเดตล่าสุด: <span class="last-updated-val">--:-- น.</span></span>
             </div>
@@ -243,6 +266,19 @@
 
         <!-- ================= PAGE 3: BOOKING FORM VIEW ================= -->
         <div id="page-booking-form" class="hidden space-y-4">
+            <!-- Back Button to Time Slots -->
+            <div class="flex items-center justify-between">
+                <button 
+                    type="button"
+                    onclick="navigateToPage('time-slots')" 
+                    class="bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-chula dark:text-amber-400 border border-gray-300 dark:border-gray-600 font-medium px-4 py-2 rounded-lg text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-colors"
+                >
+                    <i class="fa-solid fa-arrow-left"></i>
+                    <span>← กลับไปเลือกเวลา</span>
+                </button>
+                <span class="text-xs text-gray-500 dark:text-gray-400">ขั้นตอนที่ 2 จาก 2</span>
+            </div>
+
             <!-- Red Notice Banner -->
             <div class="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-chula dark:text-red-300 px-4 py-3 rounded-lg text-xs sm:text-sm flex items-center gap-2 shadow-sm font-medium">
                 <i class="fa-solid fa-thumbtack text-chula dark:text-red-400 text-sm"></i>
@@ -295,7 +331,7 @@
                                 placeholder="รหัสนิสิต คนที่ 1 (ผู้จอง)" 
                                 maxlength="10"
                                 readonly
-                                class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900 font-medium text-gray-800 dark:text-gray-200 text-sm cursor-not-allowed pr-10"
+                                class="w-full px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900 font-medium text-gray-800 dark:text-gray-200 text-sm cursor-not-allowed pr-24"
                             >
                             <span class="absolute right-3 top-2.5 text-xs text-emerald-600 font-semibold flex items-center gap-1">
                                 <i class="fa-solid fa-lock"></i> Auto-filled
@@ -369,7 +405,7 @@
     <footer class="bg-gray-800 dark:bg-gray-950 text-gray-300 text-xs py-6 mt-8 border-t border-gray-700">
         <div class="max-w-5xl mx-auto px-4 text-center space-y-2">
             <p class="font-medium text-gray-200">ห้องสมุดคณะวิศวกรรมศาสตร์ จุฬาลงกรณ์มหาวิทยาลัย</p>
-            <p class="text-gray-400">เวลาทำการ: จันทร์ - ศุกร์ 08:00 - 19:00 น. | เสาร์ - อาทิตย์ 09:00 - 17:00 น.</p>
+            <p class="text-gray-400">เวลาทำการ: จันทร์ - ศุกร์ 09:00 - 19:00 น. | เสาร์ - อาทิตย์ 09:00 - 17:00 น.</p>
             <p class="text-gray-500 pt-2 border-t border-gray-700/50">© ENG Library Chula Room Reservation System</p>
         </div>
     </footer>
@@ -549,19 +585,22 @@
         ];
 
         // State Variables
-        let selectedDateType = 'today';
+        let selectedDateObject = new Date(); // Dynamic Date State
+        let activeDateTabType = 'today'; // 'today', 'tomorrow', 'custom'
         let selectedCategory = null;
         let selectedRoom = null;
         let selectedStartTime = null;
         let activeQueueSlot = null;
         let currentUser = null; // { studentId, name, email }
 
+        // Real-time Sync Channel using BroadcastChannel API
+        const broadcastSyncChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('eng_library_sync_channel') : null;
+
         let bookingsState = [
             // Sample Mock Preset Bookings for Conflict testing
             {
                 id: 'BK-MOCK-1',
                 roomName: 'Seminar Room A',
-                dateType: 'today',
                 dateStr: '',
                 startTime: '10:00',
                 endTime: '11:00',
@@ -597,13 +636,19 @@
             return `${date.getDate()} ${thaiMonths[date.getMonth()]} ${date.getFullYear() + 543}`;
         };
 
-        const getTargetDate = (type) => {
-            const d = new Date();
-            if (type === 'tomorrow') d.setDate(d.getDate() + 1);
-            return d;
+        const formatShortDate = (date) => `${date.getDate()} ${["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."][date.getMonth()]}`;
+
+        const formatDateForInput = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         };
 
-        const getFormattedDateString = (type) => formatThaiDate(getTargetDate(type));
+        const isSameDay = (d1, d2) => 
+            d1.getFullYear() === d2.getFullYear() &&
+            d1.getMonth() === d2.getMonth() &&
+            d1.getDate() === d2.getDate();
 
         window.onload = function() {
             loadBookingsFromStorage();
@@ -612,34 +657,142 @@
             const tomorrow = new Date();
             tomorrow.setDate(today.getDate() + 1);
 
-            document.getElementById('display-date-today').textContent = formatThaiDate(today);
-            document.getElementById('display-date-tomorrow').textContent = formatThaiDate(tomorrow);
-
-            document.getElementById('ts-date-today-val').textContent = formatThaiDate(today);
-            document.getElementById('ts-date-tomorrow-val').textContent = formatThaiDate(tomorrow);
+            document.getElementById('display-date-today-short').textContent = formatShortDate(today);
+            document.getElementById('display-date-tomorrow-short').textContent = formatShortDate(tomorrow);
+            document.getElementById('custom-date-picker').value = formatDateForInput(today);
 
             // Mock date string alignment
             bookingsState.forEach(b => { if(!b.dateStr) b.dateStr = formatThaiDate(today); });
 
             updateTimestamp();
+            updateSelectedDateLabel();
             renderAccordions();
             renderRoomStatusOverview();
+            checkLiveOperatingStatus();
             startClock();
             updateAuthHeader();
+
+            // BroadcastChannel Listener for Real-Time Multi-Tab Sync
+            if (broadcastSyncChannel) {
+                broadcastSyncChannel.onmessage = (event) => {
+                    if (event.data && event.data.type === 'BOOKINGS_UPDATED') {
+                        loadBookingsFromStorage();
+                        refreshCurrentView();
+                        showToast('ข้อมูลอัปเดตเรียบร้อยแล้ว (Real-time)', 'info');
+                    }
+                };
+            }
+
+            // Storage Event Fallback for cross-window sync
+            window.addEventListener('storage', (e) => {
+                if (e.key === 'eng_lib_bookings_v2') {
+                    loadBookingsFromStorage();
+                    refreshCurrentView();
+                }
+            });
         };
 
         function startClock() {
             setInterval(() => {
                 const now = new Date();
                 document.getElementById('live-clock').textContent = now.toLocaleTimeString('th-TH');
+                checkLiveOperatingStatus();
             }, 1000);
         }
 
         function updateTimestamp() {
             const now = new Date();
             const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')} น.`;
-            document.getElementById('last-updated-time').textContent = timeStr;
             document.querySelectorAll('.last-updated-val').forEach(el => el.textContent = timeStr);
+        }
+
+        function checkLiveOperatingStatus() {
+            const now = new Date();
+            const dayOfWeek = now.getDay(); // 0 = Sun, 6 = Sat
+            const isWeekend = (dayOfWeek === 0 || dayOfWeek === 6);
+            const closeHour = isWeekend ? 17 : 19;
+            const openHour = 9;
+
+            const currentHour = now.getHours();
+            const banner = document.getElementById('operating-status-banner');
+            const statusText = document.getElementById('operating-status-text');
+            const hoursText = document.getElementById('operating-hours-text');
+
+            if (currentHour < openHour || currentHour >= closeHour) {
+                // Library Closed Currently
+                banner.className = "rounded-xl p-3 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-sm border bg-red-100 text-red-800 border-red-300 dark:bg-red-950/60 dark:text-red-300 dark:border-red-800";
+                statusText.innerHTML = `<i class="fa-solid fa-door-closed text-red-600 dark:text-red-400 text-base"></i><span>ขณะนี้ห้องสมุดปิดทำการแล้ว (Closed)</span>`;
+                hoursText.textContent = `เวลาทำการวันนี้: ${openHour}:00 - ${closeHour}:00 น.`;
+                banner.classList.remove('hidden');
+            } else {
+                // Library Open Currently
+                banner.className = "rounded-xl p-3 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-sm border bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800";
+                statusText.innerHTML = `<i class="fa-solid fa-door-open text-emerald-600 dark:text-emerald-400 text-base"></i><span>ขณะนี้ห้องสมุดเปิดทำการ (Open)</span>`;
+                hoursText.textContent = `เวลาทำการวันนี้: 0${openHour}:00 - ${closeHour}:00 น.`;
+                banner.classList.remove('hidden');
+            }
+        }
+
+        function refreshCurrentView() {
+            renderRoomStatusOverview();
+            if (!document.getElementById('page-time-slots').classList.contains('hidden')) {
+                renderTimeGrid();
+            }
+        }
+
+        function updateSelectedDateLabel() {
+            const dateStr = formatThaiDate(selectedDateObject);
+            document.getElementById('selected-date-display-label').textContent = dateStr;
+            document.getElementById('timeslot-active-date-str').textContent = dateStr;
+        }
+
+        // Dynamic Date Tabs & Custom Date Handler
+        function switchDateTab(type) {
+            activeDateTabType = type;
+            const today = new Date();
+            
+            if (type === 'today') {
+                selectedDateObject = new Date();
+            } else if (type === 'tomorrow') {
+                const tomorrow = new Date();
+                tomorrow.setDate(today.getDate() + 1);
+                selectedDateObject = tomorrow;
+            }
+
+            document.getElementById('custom-date-picker').value = formatDateForInput(selectedDateObject);
+            updateDateTabStyles();
+            updateSelectedDateLabel();
+            refreshCurrentView();
+        }
+
+        function handleCustomDateChange(e) {
+            const val = e.target.value;
+            if (!val) return;
+            const parts = val.split('-');
+            selectedDateObject = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            
+            const today = new Date();
+            const tomorrow = new Date();
+            tomorrow.setDate(today.getDate() + 1);
+
+            if (isSameDay(selectedDateObject, today)) activeDateTabType = 'today';
+            else if (isSameDay(selectedDateObject, tomorrow)) activeDateTabType = 'tomorrow';
+            else activeDateTabType = 'custom';
+
+            updateDateTabStyles();
+            updateSelectedDateLabel();
+            refreshCurrentView();
+        }
+
+        function updateDateTabStyles() {
+            const btnToday = document.getElementById('tab-today');
+            const btnTomorrow = document.getElementById('tab-tomorrow');
+
+            const activeClass = "flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-chula text-white shadow";
+            const inactiveClass = "flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200";
+
+            btnToday.className = (activeDateTabType === 'today') ? activeClass : inactiveClass;
+            btnTomorrow.className = (activeDateTabType === 'tomorrow') ? activeClass : inactiveClass;
         }
 
         // --- Real-time Room Status Overview Generator ---
@@ -657,7 +810,6 @@
             let index = 0;
             ROOM_CATEGORIES.forEach(cat => {
                 cat.rooms.forEach(room => {
-                    // Random deterministic status mapping for display showcase
                     const statusObj = statusTypes[index % statusTypes.length];
                     index++;
 
@@ -696,7 +848,6 @@
             const email = document.getElementById('login-email').value.trim().toLowerCase();
             const name = document.getElementById('login-name').value.trim();
 
-            // Strict Validation for Chula Engineering Student Email
             const emailRegex = /^([0-9]{10})@student\.chula\.ac\.th$/;
             const match = email.match(emailRegex);
 
@@ -709,19 +860,16 @@
             const yearPrefix = parseInt(studentId.substring(0, 2), 10);
             const facultySuffix = studentId.substring(8, 10);
 
-            // Year range validation (66 - 69 for 2569)
             if (yearPrefix < 66 || yearPrefix > 69) {
                 showToast(`รหัสนิสิตขึ้นต้นด้วย ${yearPrefix} ไม่อยู่ในช่วงปีการศึกษา 4 ปีปัจจุบัน (66-69)`, 'error');
                 return;
             }
 
-            // Faculty Code Validation (21 = Engineering)
             if (facultySuffix !== '21') {
                 showToast('รหัสนิสิตต้องลงท้ายด้วย 21 (คณะวิศวกรรมศาสตร์) เท่านั้น', 'error');
                 return;
             }
 
-            // Successfully Authenticated
             currentUser = { studentId, name, email };
             localStorage.setItem('chula_user', JSON.stringify(currentUser));
             updateAuthHeader();
@@ -811,27 +959,6 @@
             icon.classList.toggle('rotate-180');
         }
 
-        function switchDateTab(type) {
-            selectedDateType = type;
-            const btnToday = document.getElementById('tab-today');
-            const btnTomorrow = document.getElementById('tab-tomorrow');
-
-            const tsToday = document.getElementById('timeslot-date-today');
-            const tsTomorrow = document.getElementById('timeslot-date-tomorrow');
-
-            if (type === 'today') {
-                btnToday.className = "py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 bg-white dark:bg-gray-700 text-chula dark:text-amber-300 shadow font-semibold flex flex-col items-center justify-center";
-                btnTomorrow.className = "py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-chula flex flex-col items-center justify-center";
-                tsToday.className = "py-2.5 px-4 rounded-lg text-xs sm:text-sm bg-white dark:bg-gray-700 text-chula dark:text-amber-300 font-bold shadow flex flex-col items-center justify-center";
-                tsTomorrow.className = "py-2.5 px-4 rounded-lg text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex flex-col items-center justify-center";
-            } else {
-                btnTomorrow.className = "py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 bg-white dark:bg-gray-700 text-chula dark:text-amber-300 shadow font-semibold flex flex-col items-center justify-center";
-                btnToday.className = "py-3 px-4 rounded-lg text-sm sm:text-base transition-all duration-200 text-gray-600 dark:text-gray-400 hover:text-chula flex flex-col items-center justify-center";
-                tsTomorrow.className = "py-2.5 px-4 rounded-lg text-xs sm:text-sm bg-white dark:bg-gray-700 text-chula dark:text-amber-300 font-bold shadow flex flex-col items-center justify-center";
-                tsToday.className = "py-2.5 px-4 rounded-lg text-xs sm:text-sm text-gray-600 dark:text-gray-400 flex flex-col items-center justify-center";
-            }
-        }
-
         function navigateToPage(pageName) {
             document.getElementById('page-home').classList.add('hidden');
             document.getElementById('page-time-slots').classList.add('hidden');
@@ -843,17 +970,21 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // --- Page 2: Dynamic Time Slots Generation with Bug Fixes ---
+        // --- Page 2: Dynamic Time Slots Generation with Real-time Rules ---
         function goToTimeSlotPage(catId, roomId) {
             selectedCategory = ROOM_CATEGORIES.find(c => c.id === catId);
             selectedRoom = selectedCategory.rooms.find(r => r.id === roomId);
 
             document.getElementById('timeslot-room-title').textContent = selectedRoom.name;
-            switchDateTab(selectedDateType);
+            renderTimeGrid();
+            navigateToPage('time-slots');
+        }
 
-            const targetDate = getTargetDate(selectedDateType);
-            const isWeekend = (targetDate.getDay() === 0 || targetDate.getDay() === 6); // 0 = Sunday, 6 = Saturday
-            const maxClosingHour = isWeekend ? 17 : 19; // Saturday/Sunday closing at 17:00, Weekdays 19:00
+        function renderTimeGrid() {
+            if (!selectedRoom || !selectedCategory) return;
+
+            const isWeekend = (selectedDateObject.getDay() === 0 || selectedDateObject.getDay() === 6);
+            const maxClosingHour = isWeekend ? 17 : 19;
 
             document.getElementById('library-closing-notice').innerHTML = 
                 `<i class="fa-solid fa-clock-rotate-left mr-1"></i>เวลาทำการวันนี้: ปิด ${maxClosingHour}:00 น.`;
@@ -862,10 +993,10 @@
             container.innerHTML = '';
 
             const now = new Date();
+            const isSelectedDateToday = isSameDay(selectedDateObject, now);
             const currentMinsTotal = now.getHours() * 60 + now.getMinutes();
-            const dateStr = getFormattedDateString(selectedDateType);
+            const dateStr = formatThaiDate(selectedDateObject);
 
-            // Generate slots from 09:00 to closing time minus 15 min
             for (let hour = 9; hour < maxClosingHour; hour++) {
                 for (let min = 0; min < 60; min += 15) {
                     const slotMinsTotal = hour * 60 + min;
@@ -873,10 +1004,10 @@
                     const mStr = String(min).padStart(2, '0');
                     const timeSlotStr = `${hStr}:${mStr}`;
 
-                    // Check Bug 2: Past Time Lock for "Today"
-                    const isPast = (selectedDateType === 'today' && slotMinsTotal <= currentMinsTotal);
+                    // Past Time Lock check
+                    const isPast = isSelectedDateToday && (slotMinsTotal <= currentMinsTotal);
 
-                    // Check Bug 1: Conflict Booking (Is already booked)
+                    // Conflict Booking Check
                     const isBooked = bookingsState.some(b => 
                         b.roomName === selectedRoom.name &&
                         b.dateStr === dateStr &&
@@ -886,28 +1017,28 @@
 
                     const btn = document.createElement('div');
 
-                    if (isBooked) {
-                        // Conflict Slot UI + Queue Request Button
+                    if (isPast) {
+                        // Strict Rule: Past slots are locked and CANNOT request queue
+                        btn.className = "bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-400 p-3 rounded-xl text-center font-bold text-sm sm:text-base cursor-not-allowed opacity-60";
+                        btn.innerHTML = `
+                            <span>${timeSlotStr}</span>
+                            <div class="text-[10px] text-gray-400 font-normal">เลยเวลา (ล็อก)</div>
+                        `;
+                    } else if (isBooked) {
+                        // Future Booked Slot: Allowed to request Queue
                         btn.className = "bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-400 p-2 rounded-xl text-center flex flex-col justify-between items-center text-xs";
                         btn.innerHTML = `
                             <span class="font-bold line-through">${timeSlotStr}</span>
                             <span class="text-[10px] text-red-500 font-semibold my-0.5">จองแล้ว</span>
                             <button 
                                 onclick="openQueueModal('${selectedRoom.name}', '${timeSlotStr}')" 
-                                class="bg-amber-500 hover:bg-amber-600 text-white font-medium px-2 py-0.5 rounded text-[10px] w-full mt-1"
+                                class="bg-amber-500 hover:bg-amber-600 text-white font-medium px-2 py-0.5 rounded text-[10px] w-full mt-1 transition-colors"
                             >
                                 ยื่นขอคิว
                             </button>
                         `;
-                    } else if (isPast) {
-                        // Past Time Disabled UI
-                        btn.className = "bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-400 p-3 rounded-xl text-center font-bold text-sm sm:text-base cursor-not-allowed opacity-60";
-                        btn.innerHTML = `
-                            <span>${timeSlotStr}</span>
-                            <div class="text-[9px] text-gray-400 font-normal">เลยเวลา</div>
-                        `;
                     } else {
-                        // Available Active Time Slot
+                        // Available Time Slot
                         btn.className = "bg-white dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 hover:border-chula text-gray-800 dark:text-gray-100 font-bold p-3 rounded-xl text-center shadow-sm transition-all duration-150 text-sm sm:text-base cursor-pointer active:scale-95 flex items-center justify-center";
                         btn.textContent = timeSlotStr;
                         btn.onclick = () => goToBookingFormPage(timeSlotStr);
@@ -916,8 +1047,6 @@
                     container.appendChild(btn);
                 }
             }
-
-            navigateToPage('time-slots');
         }
 
         // --- Page 3: Booking Form Initialization & Lock Constraints ---
@@ -930,12 +1059,11 @@
 
             selectedStartTime = timeSlot;
 
-            document.getElementById('form-date-select').innerHTML = `<option>${getFormattedDateString(selectedDateType)}</option>`;
+            document.getElementById('form-date-select').innerHTML = `<option>${formatThaiDate(selectedDateObject)}</option>`;
             document.getElementById('form-category-select').innerHTML = `<option>${selectedCategory.title}</option>`;
             document.getElementById('form-room-select').innerHTML = `<option>${selectedRoom.name}</option>`;
             document.getElementById('form-start-time').innerHTML = `<option>${selectedStartTime}</option>`;
 
-            // Fill & Lock Student ID 1 from Authenticated User
             document.getElementById('form-student-name').value = currentUser.name;
             document.getElementById('form-student-id-1').value = currentUser.studentId;
 
@@ -943,8 +1071,7 @@
             const endSelect = document.getElementById('form-end-time');
             endSelect.innerHTML = '';
 
-            const targetDate = getTargetDate(selectedDateType);
-            const isWeekend = (targetDate.getDay() === 0 || targetDate.getDay() === 6);
+            const isWeekend = (selectedDateObject.getDay() === 0 || selectedDateObject.getDay() === 6);
             const maxClosingHour = isWeekend ? 17 : 19;
 
             const [startH, startM] = selectedStartTime.split(':').map(Number);
@@ -969,7 +1096,7 @@
             navigateToPage('booking-form');
         }
 
-        // Handle Final Submission
+        // Handle Final Submission & Real-time Broadcast Sync
         function handleFormSubmission(e) {
             e.preventDefault();
 
@@ -987,7 +1114,7 @@
                 id: 'BK-' + Date.now(),
                 roomName: selectedRoom.name,
                 categoryName: selectedCategory.title,
-                dateStr: getFormattedDateString(selectedDateType),
+                dateStr: formatThaiDate(selectedDateObject),
                 startTime: selectedStartTime,
                 endTime: endTimeVal,
                 studentName: studentName,
@@ -997,7 +1124,7 @@
             };
 
             bookingsState.push(newBooking);
-            saveBookingsToStorage();
+            saveAndSyncBookings();
 
             showToast(`จองห้อง ${selectedRoom.name} สำเร็จเรียบร้อย!`, 'success');
             document.getElementById('main-booking-form').reset();
@@ -1033,14 +1160,18 @@
 
         function handleQueueRequestSubmit(e) {
             e.preventDefault();
-            const reason = document.getElementById('queue-reason-text').value.trim();
 
             showToast('ยื่นคำขอขอสละสิทธิ์คิวสำเร็จแล้ว! ระบบจะส่งการแจ้งเตือนไปยังผู้จองเดิม', 'success');
             document.getElementById('queue-reason-text').value = '';
             closeQueueModal();
+            
+            // Broadcast Realtime Event
+            if (broadcastSyncChannel) {
+                broadcastSyncChannel.postMessage({ type: 'QUEUE_REQUEST_SENT', slot: activeQueueSlot });
+            }
         }
 
-        // --- Search Modal & Local Storage ---
+        // --- Search Modal & Real-time Cancel Logic ---
         function handleSearch(e) {
             e.preventDefault();
             const searchId = document.getElementById('search-student-id').value.trim();
@@ -1101,13 +1232,17 @@
 
         function cancelBooking(bookingId) {
             bookingsState = bookingsState.filter(b => b.id !== bookingId);
-            saveBookingsToStorage();
+            saveAndSyncBookings();
             closeSearchModal();
             showToast('ยกเลิกรายการจองเรียบร้อยแล้ว', 'info');
         }
 
-        function saveBookingsToStorage() {
+        function saveAndSyncBookings() {
             localStorage.setItem('eng_lib_bookings_v2', JSON.stringify(bookingsState));
+            if (broadcastSyncChannel) {
+                broadcastSyncChannel.postMessage({ type: 'BOOKINGS_UPDATED' });
+            }
+            refreshCurrentView();
         }
 
         function loadBookingsFromStorage() {
