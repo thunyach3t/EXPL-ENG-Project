@@ -889,9 +889,10 @@
 
       selectedStartTime = startTime;
       
-      // ใช้ selectedDateStr แปลงเป็นรูปแบบวันที่ไทยแสดงผลในฟอร์มให้ตรงกัน
-      const dateObj = new Date(selectedDateStr + 'T00:00:00');
-      document.getElementById('formDateDisplay').value = formatDateTh(dateObj);
+      // ดึงค่า selectedDateStr ที่กำลังดูอยู่มาแสดงในฟอร์มจองทันที (ไม่ว่าจะวันนี้หรือพรุ่งนี้)
+      const dateParts = selectedDateStr.split('-');
+      const targetDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+      document.getElementById('formDateDisplay').value = formatDateTh(targetDate);
       
       document.getElementById('formRoomDisplay').value = selectedRoom.name;
       document.getElementById('startTimeDisplay').value = `${startTime} น.`;
@@ -900,7 +901,7 @@
       selectEnd.innerHTML = '';
       const [sh, sm] = startTime.split(':').map(Number);
       const startMins = sh * 60 + sm;
-      const isWeekend = new Date(selectedDateStr).getDay() % 6 === 0;
+      const isWeekend = targetDate.getDay() % 6 === 0;
       const maxEndMins = Math.min(startMins + Math.min(120, 120 - usedMins), isWeekend ? 17 * 60 : 19 * 60);
 
       for (let m = startMins + 15; m <= maxEndMins; m += 15) {
@@ -1168,12 +1169,12 @@
     }
 
     function selectDate(type) {
-      const todayStr = formatDateISO(new Date());
-      const tmrStr = formatDateISO(new Date(Date.now() + 86400000));
-      selectedDateStr = (type === 'today') ? todayStr : tmrStr;
+      const today = new Date();
+      const tmr = new Date(Date.now() + 86400000);
+      selectedDateStr = (type === 'today') ? formatDateISO(today) : formatDateISO(tmr);
 
-      document.getElementById('btnDateToday').className = `py-2.5 px-4 rounded-lg font-medium border text-center transition text-sm ${selectedDateStr === todayStr ? 'bg-chula-main text-white border-chula-main' : 'bg-gray-50 dark:bg-gray-800'}`;
-      document.getElementById('btnDateTomorrow').className = `py-2.5 px-4 rounded-lg font-medium border text-center transition text-sm ${selectedDateStr === tmrStr ? 'bg-chula-main text-white border-chula-main' : 'bg-gray-50 dark:bg-gray-800'}`;
+      document.getElementById('btnDateToday').className = `py-2.5 px-4 rounded-lg font-medium border text-center transition text-sm ${selectedDateStr === formatDateISO(today) ? 'bg-chula-main text-white border-chula-main' : 'bg-gray-50 dark:bg-gray-800'}`;
+      document.getElementById('btnDateTomorrow').className = `py-2.5 px-4 rounded-lg font-medium border text-center transition text-sm ${selectedDateStr === formatDateISO(tmr) ? 'bg-chula-main text-white border-chula-main' : 'bg-gray-50 dark:bg-gray-800'}`;
       
       renderAllOverviewGrids();
     }
@@ -1189,7 +1190,12 @@
     }
 
     function closeModal() { document.getElementById('modalOverlay').classList.add('hidden'); }
-    function formatDateISO(d) { return d.toISOString().split('T')[0]; }
+    function formatDateISO(d) { 
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
     function formatDateTh(d) {
       const m = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
       return `${d.getDate()} ${m[d.getMonth()]} ${d.getFullYear() + 543}`;
