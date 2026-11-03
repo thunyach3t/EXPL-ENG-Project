@@ -111,12 +111,12 @@
         <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
       </h2>
       <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
-        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิตลงท้าย 21)
+        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิตลงท้าย 21) หรือพิมพ์ student_admin.chula.ac.th สำหรับแอดมิน
       </p>
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-medium mb-1">อีเมลนิสิต / แอดมิน</label>
-          <input type="text" id="loginEmail" required placeholder="ตัวอย่าง:6630xxxx21@student.chula.ac.th"
+          <input type="text" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th หรือ student_admin.chula.ac.th"
             class="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-chula-main outline-none text-sm">
         </div>
         <p id="loginError" class="text-xs text-red-500 hidden"></p>
@@ -423,6 +423,7 @@
         realTimeBookings = [];
         snapshot.forEach(doc => realTimeBookings.push({ id: doc.id, ...doc.data() }));
         renderAllOverviewGrids();
+        updateNotificationBellHub();
       });
 
       db.collection("queue_requests").onSnapshot(snapshot => {
@@ -476,7 +477,7 @@
 
       const myBookings = realTimeBookings.filter(b => b.bookerEmail === currentUser.email);
       const incomingReqs = realTimeRequests.filter(r => 
-        myBookings.some(b => b.roomId === r.roomId && b.date === r.date && r.timeSlot >= b.startTime && r.timeSlot < b.endTime)
+        myBookings.some(b => b.roomId === r.roomId && b.date === r.date)
         && r.status === 'pending'
       );
       const mySubmittedReqs = realTimeRequests.filter(r => r.requesterEmail === currentUser.email && r.status !== 'pending');
@@ -535,7 +536,7 @@
         html += `
           <div class="py-2 space-y-1">
             <div class="font-bold ${isApproved ? 'text-emerald-500' : 'text-red-500'}">
-              ${isApproved ? '✅ คำขอได้รับการอนุมัติแล้ว!' : '❌ คำถูกปฏิเสธ'}
+              ${isApproved ? '✅ คำขอได้รับการอนุมัติแล้ว!' : '❌ คำขอถูกปฏิเสธ'}
             </div>
             <div>ห้อง ${req.roomName} | ${req.date}</div>
           </div>
@@ -549,7 +550,7 @@
       const req = realTimeRequests.find(r => r.id === reqId);
       if (!req) return;
 
-      const parentBooking = realTimeBookings.find(b => b.roomId === req.roomId && b.date === req.date && req.timeSlot >= b.startTime && req.timeSlot < b.endTime);
+      const parentBooking = realTimeBookings.find(b => b.roomId === req.roomId && b.date === req.date);
       if (!parentBooking) { alert('ไม่พบข้อมูลการจองเดิม'); return; }
 
       const currentStudents = parentBooking.studentIds || [];
@@ -573,7 +574,7 @@
       const req = realTimeRequests.find(r => r.id === reqId);
       if (!req) return;
 
-      const parentBooking = realTimeBookings.find(b => b.roomId === req.roomId && b.date === req.date && req.timeSlot >= b.startTime && req.timeSlot < b.endTime);
+      const parentBooking = realTimeBookings.find(b => b.roomId === req.roomId && b.date === req.date);
       if (!parentBooking) { alert('ไม่พบข้อมูลการจองเดิม'); return; }
 
       const reqStudentId = req.requesterEmail.split('@')[0];
@@ -755,7 +756,6 @@
       renderCategory('boxRooms', ALL_ROOMS.filter(r => r.category === 'The Box'));
     }
 
-    // UPDATED FUNCTION: Clean name ONLY when Tomorrow is selected
     function renderCategory(containerId, rooms) {
       const container = document.getElementById(containerId);
       const libInfo = getLibraryStatusInfo();
@@ -764,7 +764,6 @@
 
       container.innerHTML = rooms.map(room => {
         if (!isToday) {
-          // Tomorrow Mode: Clean Name ONLY (No Status Text / Badge)
           return `
             <div class="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
               <span class="font-bold text-sm text-gray-800 dark:text-gray-200">${room.name}</span>
@@ -774,7 +773,6 @@
             </div>
           `;
         } else {
-          // Today Mode: Show Realtime Status & Badge
           const st = libInfo.isClosed ? 'ห้องปิด' : getRoomOverallStatus(room.id, selectedDateStr);
           let badgeColor = st === 'ว่าง' ? 'bg-emerald-500' : (st === 'รอการยืนยัน' ? 'bg-amber-400' : (st === 'แชร์ร่วมกันได้' ? 'bg-pink-400' : 'bg-gray-400'));
           return `
