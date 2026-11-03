@@ -403,7 +403,6 @@
       });
     }
 
-    // Check Total Booked Hours for Current User on Selected Date (Max 2 Hours)
     function getUserTotalBookedMinutesOnDate(studentId, dateStr) {
       let totalMins = 0;
       realTimeBookings.forEach(b => {
@@ -416,7 +415,6 @@
       return totalMins;
     }
 
-    // Check Library Closing Status Realtime
     function getLibraryStatusInfo() {
       const now = new Date();
       const todayStr = now.toISOString().split('T')[0];
@@ -424,15 +422,15 @@
 
       const dateObj = new Date(selectedDateStr);
       const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+      const openingHour = isWeekend ? 9 : 8; // Mon-Fri opens at 8:00, Sat-Sun at 9:00
       const closingHour = isWeekend ? 17 : 19;
-      const openingHour = 9;
 
       const currentMins = now.getHours() * 60 + now.getMinutes();
       const openingMins = openingHour * 60;
       const closingMins = closingHour * 60;
 
       let isClosed = false;
-      let statusText = isWeekend ? 'เสาร์-อาทิตย์ (เปิด 09:00 - 17:00 น.)' : 'จันทร์-ศุกร์ (เปิด 09:00 - 19:00 น.)';
+      let statusText = isWeekend ? 'เสาร์-อาทิตย์ (เปิด 09:00 - 17:00 น.)' : 'จันทร์-ศุกร์ (เปิด 08:00 - 19:00 น.)';
 
       if (isToday) {
         if (currentMins < openingMins || currentMins >= closingMins) {
@@ -441,7 +439,7 @@
         }
       }
 
-      return { isClosed, statusText };
+      return { isClosed, statusText, openingHour, closingHour };
     }
 
     function updateNotificationBellHub() {
@@ -504,18 +502,13 @@
       listEl.innerHTML = html;
     }
 
-    // Approve and Transfer Booking Ownership & Time Slot
     async function approveQueueRequest(reqId) {
       const req = realTimeRequests.find(r => r.id === reqId);
       if (!req) return;
 
       const parentBooking = realTimeBookings.find(b => b.roomId === req.roomId && b.date === req.date && req.timeSlot >= b.startTime && req.timeSlot < b.endTime);
-      if (!parentBooking) {
-        alert('ไม่พบข้อมูลการจองเดิม');
-        return;
-      }
+      if (!parentBooking) { alert('ไม่พบข้อมูลการจองเดิม'); return; }
 
-      // Update parent booking ownership & time range to requester
       const reqStudentId = req.requesterEmail.split('@')[0];
       await db.collection("bookings").doc(parentBooking.id).update({
         bookerEmail: req.requesterEmail,
@@ -526,7 +519,7 @@
       });
 
       await db.collection("queue_requests").doc(reqId).update({ status: 'approved' });
-      alert('✅ อนุมัติและถ่ายโอนสิทธิ์การจองให้ผู้ยื่นคำขอเรียบร้อยแล้ว');
+      alert('✅ อนุมัติและถ่ายโอนสิทธิ์การจองเรียบร้อย');
     }
 
     async function respondQueueRequest(reqId, status) {
@@ -562,7 +555,7 @@
         else colorClasses = "bg-red-50 border-red-500 text-red-700 dark:bg-red-950/60 dark:text-red-300";
 
         return `
-          <div onclick="${libInfo.isClosed ? '' : `openRoomTimeSlots('${room.id}', '${room.name}')`}" 
+          <div onclick="openRoomTimeSlots('${room.id}', '${room.name}')" 
             class="p-3 border-2 rounded-xl text-center cursor-pointer hover:scale-105 transition transform flex flex-col justify-center items-center h-20 ${colorClasses}">
             <div class="font-bold text-xs sm:text-sm truncate w-full">${room.name}</div>
             <div class="text-[11px] font-semibold mt-1">${status}</div>
@@ -598,22 +591,15 @@
               <span class="w-3 h-3 rounded-full ${badgeColor}"></span>
               <span class="font-bold text-sm">${room.name} <span class="text-xs text-gray-500 font-normal">(${st})</span></span>
             </div>
-            ${libInfo.isClosed ? '<span class="text-xs text-gray-400 font-semibold">ห้องปิดทำการ</span>' : `
-              <button onclick="openRoomTimeSlots('${room.id}', '${room.name}')" class="text-chula-main dark:text-red-400 font-bold text-xs flex items-center space-x-1">
-                <span>จองออนไลน์</span><i class="fa-solid fa-chevron-right text-[10px]"></i>
-              </button>
-            `}
+            <button onclick="openRoomTimeSlots('${room.id}', '${room.name}')" class="text-chula-main dark:text-red-400 font-bold text-xs flex items-center space-x-1">
+              <span>จองออนไลน์</span><i class="fa-solid fa-chevron-right text-[10px]"></i>
+            </button>
           </div>
         `;
       }).join('');
     }
 
     function openRoomTimeSlots(roomId, roomName) {
-      const libInfo = getLibraryStatusInfo();
-      if (libInfo.isClosed) {
-        alert('ห้องสมุดปิดทำการแล้ว ไม่สามารถจองได้');
-        return;
-      }
       selectedRoom = { id: roomId, name: roomName };
       document.getElementById('selectedRoomTitle').innerText = roomName;
       showPage('pageTimeSlots');
@@ -624,14 +610,15 @@
       const grid = document.getElementById('timeSlotsGrid');
       grid.innerHTML = '';
 
-      const dateObj = new Date(selectedDateStr);
-      const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
-      const closingTimeStr = isWeekend ? "17:00" : "19:00";
+      const libInfo = getLibraryStatusInfo();
+      const startHour = libInfo.openingHour; // 8 for Mon-Fri, 9 for Sat-Sun
+      const closingTimeStr = libInfo.closingHour === 17 ? "17:00" : "19:00";
+
       const now = new Date();
       const isToday = selectedDateStr === formatDateISO(now);
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-      let startMins = 9 * 60;
+      let startMins = startHour * 60;
       let [ch, cm] = closingTimeStr.split(':').map(Number);
       let endMins = ch * 60 + cm;
 
@@ -676,7 +663,6 @@
     function selectTimeSlotForBooking(startTime) {
       if (!currentUser) { openLoginModal(); return; }
 
-      // Check 2 hours quota per day
       const usedMins = getUserTotalBookedMinutesOnDate(currentUser.studentId, selectedDateStr);
       if (usedMins >= 120) {
         alert('❌ คุณได้ใช้โควตาการจองครบ 2 ชั่วโมงสำหรับวันนี้แล้ว');
@@ -745,7 +731,6 @@
       showPage('pageRoomList');
     }
 
-    // Queue request modal allowing users to select custom start/end time within booked range
     function promptQueue(time, rangeStart, rangeEnd) {
       if (!currentUser) { openLoginModal(); return; }
 
@@ -757,8 +742,6 @@
 
       const modal = document.getElementById('modalOverlay');
       
-      // Generate options for start and end time within rangeStart and rangeEnd
-      let optionsHtml = '';
       let [rsh, rsm] = rangeStart.split(':').map(Number);
       let [reh, rem] = rangeEnd.split(':').map(Number);
       let startM = rsh * 60 + rsm;
