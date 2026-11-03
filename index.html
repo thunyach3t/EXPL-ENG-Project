@@ -111,12 +111,12 @@
         <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
       </h2>
       <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
-        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิตลงท้าย 21)
+        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิตลงท้าย 21) หรือพิมพ์ student_admin.chula.ac.th สำหรับแอดมิน
       </p>
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-medium mb-1">อีเมลนิสิต / แอดมิน</label>
-          <input type="text" id="loginEmail" required placeholder="Ex. 6630xxxx21@student.chula.ac.th"
+          <input type="text" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th หรือ student_admin.chula.ac.th"
             class="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-chula-main outline-none text-sm">
         </div>
         <p id="loginError" class="text-xs text-red-500 hidden"></p>
@@ -436,10 +436,20 @@
     function getUserTotalBookedMinutesOnDate(studentId, dateStr) {
       let totalMins = 0;
       realTimeBookings.forEach(b => {
-        if (b.date === dateStr && b.studentIds && b.studentIds.includes(studentId)) {
-          const [sh, sm] = b.startTime.split(':').map(Number);
-          const [eh, em] = b.endTime.split(':').map(Number);
-          totalMins += (eh * 60 + em) - (sh * 60 + sm);
+        if (b.date === dateStr) {
+          // Check if main booker or inside studentDetails with custom time
+          if (b.studentDetails) {
+            const detail = b.studentDetails.find(d => d.studentId === studentId);
+            if (detail) {
+              const [sh, sm] = detail.startTime.split(':').map(Number);
+              const [eh, em] = detail.endTime.split(':').map(Number);
+              totalMins += (eh * 60 + em) - (sh * 60 + sm);
+            }
+          } else if (b.studentIds && b.studentIds.includes(studentId)) {
+            const [sh, sm] = b.startTime.split(':').map(Number);
+            const [eh, em] = b.endTime.split(':').map(Number);
+            totalMins += (eh * 60 + em) - (sh * 60 + sm);
+          }
         }
       });
       return totalMins;
@@ -553,19 +563,32 @@
       const parentBooking = realTimeBookings.find(b => b.roomId === req.roomId && b.date === req.date);
       if (!parentBooking) { alert('ไม่พบข้อมูลการจองเดิม'); return; }
 
-      const currentStudents = parentBooking.studentIds || [];
+      let studentIds = parentBooking.studentIds || [];
+      let studentDetails = parentBooking.studentDetails || [];
       const reqStudentId = req.requesterEmail.split('@')[0];
 
-      if (currentStudents.length >= 6) {
+      if (studentIds.length >= 6) {
         alert('❌ สมาชิกในห้องเต็ม Limit (6 คน) แล้ว');
         return;
       }
 
-      if (!currentStudents.includes(reqStudentId)) {
-        currentStudents.push(reqStudentId);
+      if (!studentIds.includes(reqStudentId)) {
+        studentIds.push(reqStudentId);
       }
 
-      await db.collection("bookings").doc(parentBooking.id).update({ studentIds: currentStudents });
+      // Add detailed timeframe for this specific requester
+      studentDetails = studentDetails.filter(d => d.studentId !== reqStudentId);
+      studentDetails.push({
+        studentId: reqStudentId,
+        email: req.requesterEmail,
+        startTime: req.reqStartTime,
+        endTime: req.reqEndTime
+      });
+
+      await db.collection("bookings").doc(parentBooking.id).update({ 
+        studentIds: studentIds,
+        studentDetails: studentDetails
+      });
       await db.collection("queue_requests").doc(reqId).update({ status: 'approved' });
       alert('✅ ยอมรับผู้เข้าร่วมห้องแชร์สำเร็จ');
     }
@@ -583,7 +606,8 @@
         bookerName: `นิสิต (${reqStudentId})`,
         startTime: req.reqStartTime,
         endTime: req.reqEndTime,
-        studentIds: [reqStudentId]
+        studentIds: [reqStudentId],
+        studentDetails: [{ studentId: reqStudentId, email: req.requesterEmail, startTime: req.reqStartTime, endTime: req.reqEndTime }]
       });
 
       await db.collection("queue_requests").doc(reqId).update({ status: 'approved' });
@@ -693,6 +717,7 @@
         isShareable: false,
         status: 'occupied',
         studentIds: [stdId],
+        studentDetails: [{ studentId: stdId, email: `${stdId}@student.chula.ac.th`, startTime: start, endTime: end }],
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
 
@@ -900,6 +925,21 @@
         return;
       }
 
+      const std1 = currentUser.studentId;
+      const std2 = document.getElementById('studentId2').value.trim();
+      const std3 = document.getElementById('studentId3').value.trim();
+      const std4 = document.getElementById('studentId4').value.trim();
+      const std5 = document.getElementById('studentId5').value.trim();
+      const std6 = document.getElementById('studentId6').value.trim();
+      const allStudents = [std1, std2, std3, std4, std5, std6].filter(id => id.length > 0);
+
+      const studentDetails = allStudents.map(id => ({
+        studentId: id,
+        email: `${id}@student.chula.ac.th`,
+        startTime: selectedStartTime,
+        endTime: endTime
+      }));
+
       const newBooking = {
         roomId: selectedRoom.id,
         roomName: selectedRoom.name,
@@ -910,14 +950,8 @@
         bookerEmail: currentUser.email,
         isShareable: isShareable,
         status: isShareable ? 'shareable' : 'occupied',
-        studentIds: [
-          currentUser.studentId,
-          document.getElementById('studentId2').value.trim(),
-          document.getElementById('studentId3').value.trim(),
-          document.getElementById('studentId4').value.trim(),
-          document.getElementById('studentId5').value.trim(),
-          document.getElementById('studentId6').value.trim(),
-        ].filter(id => id.length > 0),
+        studentIds: allStudents,
+        studentDetails: studentDetails,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
 
@@ -1073,7 +1107,14 @@
     async function searchBooking() {
       const q = document.getElementById('searchStudentId').value.trim();
       if (q.length !== 10) { alert('กรอกรหัสนิสิต 10 หลัก'); return; }
-      const res = realTimeBookings.filter(b => b.studentIds && b.studentIds.includes(q));
+      
+      const res = realTimeBookings.filter(b => {
+        if (b.studentDetails) {
+          return b.studentDetails.some(d => d.studentId === q);
+        }
+        return b.studentIds && b.studentIds.includes(q);
+      });
+
       const modal = document.getElementById('modalOverlay');
       const content = document.getElementById('modalContent');
 
@@ -1081,15 +1122,26 @@
         <h3 class="font-bold text-chula-main mb-3 text-sm">รายการจองของรหัส: ${q}</h3>
         ${res.length === 0 ? '<p class="text-xs text-gray-500">ไม่พบรายการจอง</p>' : `
           <div class="space-y-2 max-h-60 overflow-y-auto">
-            ${res.map(b => `
-              <div class="p-2.5 border rounded text-xs flex justify-between items-center bg-gray-50 dark:bg-gray-800">
-                <div>
-                  <div class="font-bold">${b.roomName} (${b.isShareable ? '🌸 แชร์ได้' : '🔒 ส่วนตัว'})</div>
-                  <div>📅 ${b.date} | 🕒 ${b.startTime} - ${b.endTime} น.</div>
+            ${res.map(b => {
+              let displayStart = b.startTime;
+              let displayEnd = b.endTime;
+              if (b.studentDetails) {
+                const found = b.studentDetails.find(d => d.studentId === q);
+                if (found) {
+                  displayStart = found.startTime;
+                  displayEnd = found.endTime;
+                }
+              }
+              return `
+                <div class="p-2.5 border rounded text-xs flex justify-between items-center bg-gray-50 dark:bg-gray-800">
+                  <div>
+                    <div class="font-bold">${b.roomName} (${b.isShareable ? '🌸 แชร์ได้' : '🔒 ส่วนตัว'})</div>
+                    <div>📅 ${b.date} | 🕒 ${displayStart} - ${displayEnd} น.</div>
+                  </div>
+                  <button onclick="cancelBooking('${b.id}')" class="px-2 py-1 bg-red-600 text-white rounded text-[10px]">ยกเลิก</button>
                 </div>
-                <button onclick="cancelBooking('${b.id}')" class="px-2 py-1 bg-red-600 text-white rounded text-[10px]">ยกเลิก</button>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
         `}
       `;
