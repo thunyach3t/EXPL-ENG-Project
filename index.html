@@ -90,7 +90,7 @@
             <span>เข้าสู่ระบบ</span>
           </button>
           <div id="userInfoCorner" class="hidden text-xs bg-chula-hover px-3 py-1.5 rounded-lg flex items-center space-x-2">
-            <i class="fa-solid fa-user-graduate text-yellow-300"></i>
+            <i id="userIconRole" class="fa-solid fa-user-graduate text-yellow-300"></i>
             <span id="userEmailSpan" class="font-mono font-semibold"></span>
             <button onclick="logout()" class="text-red-300 hover:text-white underline ml-1">(ออก)</button>
           </div>
@@ -111,12 +111,12 @@
         <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
       </h2>
       <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
-        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิตลงท้าย 21)
+        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิตลงท้าย 21) หรือพิมพ์ student_admin.chula.ac.th สำหรับแอดมิน
       </p>
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-medium mb-1">อีเมลนิสิต</label>
-          <input type="email" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th"
+          <label class="block text-xs font-medium mb-1">อีเมลนิสิต / แอดมิน</label>
+          <input type="text" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th หรือ student_admin.chula.ac.th"
             class="w-full px-4 py-2 border rounded-lg dark:bg-gray-800 dark:border-gray-700 focus:ring-2 focus:ring-chula-main outline-none text-sm">
         </div>
         <p id="loginError" class="text-xs text-red-500 hidden"></p>
@@ -130,7 +130,18 @@
   <!-- Main Container -->
   <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
 
-    <!-- Search & Date Selection Header (Max 2 Days: Today & Tomorrow) -->
+    <!-- Admin Panel Quick Access (Visible only when logged in as admin) -->
+    <div id="adminPanelBanner" class="hidden bg-red-900 text-white p-4 rounded-xl shadow-md flex justify-between items-center">
+      <div>
+        <h3 class="font-bold text-sm"><i class="fa-solid fa-shield-halved mr-1"></i> โหมดผู้ดูแลระบบ (Admin Panel)</h3>
+        <p class="text-xs text-red-200">คุณสามารถจัดการคิวทั้งหมด ลบ หรือลงคิว Walk-in แทนนิสิตได้</p>
+      </div>
+      <button onclick="openAdminModal()" class="px-4 py-2 bg-white text-chula-main text-xs font-bold rounded-lg shadow hover:bg-gray-100 transition">
+        จัดการคิวทั้งหมด
+      </button>
+    </div>
+
+    <!-- Search & Date Selection Header -->
     <div class="bg-white dark:bg-chula-darkCard p-4 rounded-xl shadow-sm space-y-4">
       <div class="flex flex-col md:flex-row gap-2">
         <div class="relative flex-1">
@@ -154,8 +165,8 @@
       <div id="libraryStatusBanner" class="text-xs text-center font-semibold py-1.5 px-3 rounded-md"></div>
     </div>
 
-    <!-- Real-time Overview Room Status Grid -->
-    <div class="bg-white dark:bg-chula-darkCard p-5 rounded-2xl shadow-lg space-y-4 border border-gray-200 dark:border-gray-800 transition-colors">
+    <!-- Real-time Overview Room Status Grid (Shows ONLY on 'Today') -->
+    <div id="realtimeOverviewContainer" class="bg-white dark:bg-chula-darkCard p-5 rounded-2xl shadow-lg space-y-4 border border-gray-200 dark:border-gray-800 transition-colors">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center space-x-2 text-base font-bold">
           <i class="fa-solid fa-chart-simple text-chula-main dark:text-red-400"></i>
@@ -340,14 +351,24 @@
     }
 
     function updateAuthCornerUI(isLoggedIn) {
+      const adminBanner = document.getElementById('adminPanelBanner');
       if (isLoggedIn && currentUser) {
         document.getElementById('btnLoginCorner').classList.add('hidden');
         document.getElementById('userInfoCorner').classList.remove('hidden');
-        document.getElementById('userEmailSpan').innerText = currentUser.studentId;
-        document.getElementById('studentId1').value = currentUser.studentId;
+        document.getElementById('userEmailSpan').innerText = currentUser.email;
+
+        if (currentUser.isAdmin) {
+          document.getElementById('userIconRole').className = "fa-solid fa-shield-halved text-yellow-300";
+          adminBanner.classList.remove('hidden');
+        } else {
+          document.getElementById('userIconRole').className = "fa-solid fa-user-graduate text-yellow-300";
+          adminBanner.classList.add('hidden');
+          document.getElementById('studentId1').value = currentUser.studentId;
+        }
       } else {
         document.getElementById('btnLoginCorner').classList.remove('hidden');
         document.getElementById('userInfoCorner').classList.add('hidden');
+        adminBanner.classList.add('hidden');
       }
     }
 
@@ -356,23 +377,33 @@
 
     function handleLogin(e) {
       e.preventDefault();
-      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      const inputVal = document.getElementById('loginEmail').value.trim().toLowerCase();
       const errEl = document.getElementById('loginError');
 
-      if (!email.endsWith('@student.chula.ac.th')) {
-        errEl.innerText = "❌ กรุณาใช้อีเมลโดเมน @student.chula.ac.th เท่านั้น";
+      // Check Admin Login: student_admin.chula.ac.th
+      if (inputVal === 'student_admin.chula.ac.th') {
+        currentUser = { email: inputVal, isAdmin: true };
+        localStorage.setItem('chula_user_session', JSON.stringify(currentUser));
+        updateAuthCornerUI(true);
+        closeLoginModal();
+        return;
+      }
+
+      // Check Student Login
+      if (!inputVal.endsWith('@student.chula.ac.th')) {
+        errEl.innerText = "❌ กรุณาใช้อีเมลโดเมน @student.chula.ac.th หรือ student_admin.chula.ac.th";
         errEl.classList.remove('hidden');
         return;
       }
 
-      const stdId = email.split('@')[0];
+      const stdId = inputVal.split('@')[0];
       if (stdId.length !== 10 || !stdId.endsWith('21')) {
         errEl.innerText = "❌ สงวนสิทธิ์เฉพาะนิสิตวิศวะ (รหัส 10 หลัก ลงท้ายด้วย 21)";
         errEl.classList.remove('hidden');
         return;
       }
 
-      currentUser = { email, studentId: stdId };
+      currentUser = { email: inputVal, studentId: stdId, isAdmin: false };
       localStorage.setItem('chula_user_session', JSON.stringify(currentUser));
       updateAuthCornerUI(true);
       closeLoginModal();
@@ -443,7 +474,7 @@
     }
 
     function updateNotificationBellHub() {
-      if (!currentUser) return;
+      if (!currentUser || currentUser.isAdmin) return;
 
       const myBookings = realTimeBookings.filter(b => b.bookerEmail === currentUser.email);
       const incomingReqs = realTimeRequests.filter(r => 
@@ -569,6 +600,108 @@
       document.getElementById('notiDropdown').classList.toggle('hidden');
     }
 
+    // Admin Panel Modal Handler
+    function openAdminModal() {
+      const modal = document.getElementById('modalOverlay');
+      const content = document.getElementById('modalContent');
+
+      content.innerHTML = `
+        <h3 class="font-bold text-chula-main mb-3 text-base"><i class="fa-solid fa-shield-halved mr-1"></i> แผงควบคุมผู้ดูแลระบบ (Admin Control)</h3>
+        <p class="text-xs text-gray-500 mb-3">จัดการคิวการจองทั้งหมดในระบบ หรือลงทะเบียนคิว Walk-in แทนนิสิต</p>
+        <div class="space-y-3 max-h-80 overflow-y-auto">
+          ${realTimeBookings.length === 0 ? '<p class="text-xs text-gray-500 text-center py-4">ไม่มีรายการจองในระบบ</p>' : 
+            realTimeBookings.map(b => `
+              <div class="p-3 border rounded-lg text-xs flex justify-between items-center bg-gray-50 dark:bg-gray-800">
+                <div>
+                  <div class="font-bold text-chula-main">${b.roomName} (${b.isShareable ? '🌸 แชร์ได้' : '🔒 ส่วนตัว'})</div>
+                  <div>📅 ${b.date} | 🕒 ${b.startTime} - ${b.endTime} น.</div>
+                  <div class="text-[11px] text-gray-500">ผู้จอง: ${b.bookerName} (${b.studentIds ? b.studentIds.join(', ') : '-'})</div>
+                </div>
+                <div class="flex space-x-1">
+                  <button onclick="adminDeleteBooking('${b.id}')" class="px-2 py-1 bg-red-600 text-white rounded text-[10px] font-bold">ลบคิว</button>
+                </div>
+              </div>
+            `).join('')}
+        </div>
+        <div class="mt-4 pt-3 border-t flex justify-between">
+          <button onclick="adminWalkInBookingPrompt()" class="px-3 py-2 bg-emerald-600 text-white rounded text-xs font-bold">+ ลงคิว Walk-in แทนนิสิต</button>
+          <button onclick="closeModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded text-xs">ปิด</button>
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    }
+
+    async function adminDeleteBooking(id) {
+      if (!confirm('ยืนยันลบคิวการจองนี้ในฐานะ Admin?')) return;
+      await db.collection("bookings").doc(id).delete();
+      alert('🗑️ ลบคิวเรียบร้อย');
+      closeModal();
+    }
+
+    function adminWalkInBookingPrompt() {
+      const content = document.getElementById('modalContent');
+      content.innerHTML = `
+        <h3 class="font-bold text-chula-main mb-3 text-base">📝 ลงคิว Walk-in โดย Admin</h3>
+        <form onsubmit="adminSubmitWalkIn(event)" class="space-y-3 text-xs">
+          <div>
+            <label class="block mb-1 font-semibold">เลือกรหัสห้อง</label>
+            <select id="adminRoom" class="w-full p-2 border rounded dark:bg-gray-800">
+              ${ALL_ROOMS.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block mb-1 font-semibold">เวลาเริ่ม</label>
+              <input type="time" id="adminStart" required class="w-full p-2 border rounded dark:bg-gray-800" value="10:00">
+            </div>
+            <div>
+              <label class="block mb-1 font-semibold">เวลาสิ้นสุด</label>
+              <input type="time" id="adminEnd" required class="w-full p-2 border rounded dark:bg-gray-800" value="11:00">
+            </div>
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">รหัสนิสิต Walk-in (10 หลัก)</label>
+            <input type="text" id="adminStdId" maxlength="10" required placeholder="6630xxxx21" class="w-full p-2 border rounded dark:bg-gray-800">
+          </div>
+          <div class="flex justify-end space-x-2 pt-2">
+            <button type="button" onclick="openAdminModal()" class="px-3 py-1.5 border rounded">ย้อนกลับ</button>
+            <button type="submit" class="px-3 py-1.5 bg-chula-main text-white font-bold rounded">บันทึก Walk-in</button>
+          </div>
+        </form>
+      `;
+    }
+
+    async function adminSubmitWalkIn(e) {
+      e.preventDefault();
+      const roomId = document.getElementById('adminRoom').value;
+      const roomObj = ALL_ROOMS.find(r => r.id === roomId);
+      const start = document.getElementById('adminStart').value;
+      const end = document.getElementById('adminEnd').value;
+      const stdId = document.getElementById('adminStdId').value.trim();
+
+      if (stdId.length !== 10) {
+        alert('รหัสนิสิตต้องมี 10 หลัก');
+        return;
+      }
+
+      await db.collection("bookings").add({
+        roomId: roomObj.id,
+        roomName: roomObj.name,
+        date: selectedDateStr,
+        startTime: start,
+        endTime: end,
+        bookerName: `Walk-in (${stdId})`,
+        bookerEmail: `${stdId}@student.chula.ac.th`,
+        isShareable: false,
+        status: 'occupied',
+        studentIds: [stdId],
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      alert('✅ ลงทะเบียน Walk-in สำเร็จ!');
+      closeModal();
+    }
+
     function renderAllOverviewGrids() {
       renderRealtimeOverviewGrid();
       renderAccordionRooms();
@@ -576,11 +709,20 @@
     }
 
     function renderRealtimeOverviewGrid() {
+      const container = document.getElementById('realtimeOverviewContainer');
       const grid = document.getElementById('realtimeOverviewGrid');
       const libInfo = getLibraryStatusInfo();
 
       document.getElementById('libraryStatusBanner').innerText = `🕒 ${libInfo.statusText}`;
       document.getElementById('libraryStatusBanner').className = `text-xs text-center font-semibold py-1.5 px-3 rounded-md ${libInfo.isClosed ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'}`;
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (selectedDateStr !== todayStr) {
+        container.classList.add('hidden');
+        return;
+      } else {
+        container.classList.remove('hidden');
+      }
 
       grid.innerHTML = ALL_ROOMS.map(room => {
         let status = libInfo.isClosed ? 'ห้องปิด' : getRoomOverallStatus(room.id, selectedDateStr);
@@ -700,6 +842,10 @@
 
     function selectTimeSlotForBooking(startTime) {
       if (!currentUser) { openLoginModal(); return; }
+      if (currentUser.isAdmin) {
+        alert('Admin กรุณาใช้เมนู Walk-in Panel');
+        return;
+      }
 
       const usedMins = getUserTotalBookedMinutesOnDate(currentUser.studentId, selectedDateStr);
       if (usedMins >= 120) {
@@ -769,13 +915,12 @@
       showPage('pageRoomList');
     }
 
-    // Prompt Share Room Join Modal
     function promptShareRoom(time, rangeStart, rangeEnd, bookingId) {
       if (!currentUser) { openLoginModal(); return; }
 
       const bookingObj = realTimeBookings.find(b => b.id === bookingId);
       if (bookingObj && bookingObj.studentIds && bookingObj.studentIds.length >= 6) {
-        alert('❌ ห้องนี้มีผู้ใช้งานเต็ม Limit (6 คน) แล้ว ไม่สามารถเข้าร่วมได้');
+        alert('❌ ห้องนี้มีผู้ใช้งานเต็ม Limit (6 คน) แล้ว');
         return;
       }
 
