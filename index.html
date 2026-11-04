@@ -124,12 +124,12 @@
         <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
       </h2>
       <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
-        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21)
+        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21) หรือพิมพ์ student_admin.chula.ac.th สำหรับแอดมิน
       </p>
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-medium mb-1">อีเมลนิสิต / แอดมิน <span class="text-red-500">*</span></label>
-          <input type="text" id="loginEmail" required placeholder="Ex. 6630xxxx21@student.chula.ac.th"
+          <input type="text" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th หรือ student_admin.chula.ac.th"
             class="w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-chula-main outline-none text-sm">
         </div>
         <p id="loginError" class="text-xs text-red-500 hidden"></p>
@@ -353,7 +353,6 @@
       checkStoredUserSession();
       initDates();
       setupFirestoreListeners();
-      // อัปเดตรันเช็คเวลา Real-time ทุกๆ 30 วินาทีเพื่อให้ป้าย Overview เปลี่ยนสถานะตามเวลาปัจจุบันเป๊ะๆ
       setInterval(() => {
         if (selectedDateStr === formatDateISO(new Date())) {
           renderRealtimeOverviewGrid();
@@ -503,9 +502,10 @@
       });
     }
 
-    function getUserTotalBookedMinutesOnDate(studentId, dateStr) {
+    function getUserTotalBookedMinutesOnDate(studentId, dateStr, excludeBookingId = null) {
       let totalMins = 0;
       realTimeBookings.forEach(b => {
+        if (b.id === excludeBookingId) return; // ข้ามการจองเดิมที่กำลังจะถ่ายโอนสิทธิ์
         if (b.date === dateStr) {
           if (b.studentDetails) {
             const detail = b.studentDetails.find(d => d.studentId === studentId);
@@ -528,9 +528,10 @@
       return (start1 < end2 && end1 > start2);
     }
 
-    function hasUserConflictOnTimeSlot(studentId, dateStr, start, end) {
+    function hasUserConflictOnTimeSlot(studentId, dateStr, start, end, excludeBookingId = null) {
       let conflict = false;
       realTimeBookings.forEach(b => {
+        if (b.id === excludeBookingId) return; // ข้ามการจองเดิมตัวเอง
         if (b.date === dateStr) {
           if (b.studentDetails) {
             b.studentDetails.forEach(d => {
@@ -705,13 +706,31 @@
       if (!parentBooking) { alert('ไม่พบข้อมูลการจองเดิม'); return; }
 
       const reqStudentId = req.requesterEmail.split('@')[0];
+      const reqEmail = req.requesterEmail;
+
+      // ตรวจสอบว่าผู้ขอใหม่มีโควตาหรือเวลาชนกับห้องอื่นหรือไม่ (โดยไม่เอาการจองเดิมของห้องนี้มานับชน)
+      const [sh, sm] = req.reqStartTime.split(':').map(Number);
+      const [eh, em] = req.reqEndTime.split(':').map(Number);
+      const reqMins = (eh * 60 + em) - (sh * 60 + sm);
+
+      const requesterUsedMins = getUserTotalBookedMinutesOnDate(reqStudentId, req.date, parentBooking.id);
+      if (requesterUsedMins + reqMins > 120) {
+        alert('❌ ผู้ขอมีโควตาการจองสะสมเกิน 2 ชั่วโมงในวันนี้แล้ว ไม่สามารถอนุมัติได้');
+        return;
+      }
+
+      if (hasUserConflictOnTimeSlot(reqStudentId, req.date, req.reqStartTime, req.reqEndTime, parentBooking.id)) {
+        alert('❌ ผู้ขอมีคิวจองห้องอื่นในช่วงเวลาทับซ้อนกันนี้อยู่แล้ว');
+        return;
+      }
+
       await db.collection("bookings").doc(parentBooking.id).update({
-        bookerEmail: req.requesterEmail,
+        bookerEmail: reqEmail,
         bookerName: `นิสิต (${reqStudentId})`,
         startTime: req.reqStartTime,
         endTime: req.reqEndTime,
         studentIds: [reqStudentId],
-        studentDetails: [{ studentId: reqStudentId, email: req.requesterEmail, startTime: req.reqStartTime, endTime: req.reqEndTime }]
+        studentDetails: [{ studentId: reqStudentId, email: reqEmail, startTime: req.reqStartTime, endTime: req.reqEndTime }]
       });
 
       await db.collection("queue_requests").doc(reqId).update({ status: 'approved' });
@@ -836,12 +855,10 @@
       if (selectedRoom) renderTimeSlots();
     }
 
-    // ฟังก์ชันเช็คสถานะห้อง "ณ เวลาปัจจุบันเป๊ะๆ" สำหรับตาราง Overview
     function getRoomCurrentRealtimeStatus(roomId, dateStr) {
       const now = new Date();
       const todayStr = formatDateISO(now);
       
-      // ถ้าไม่ใช่ของวันนี้ ให้คืนค่าเป็น 'ว่าง' หรือสถานะปกติ
       if (dateStr !== todayStr) return 'ว่าง';
 
       const currentMins = now.getHours() * 60 + now.getMinutes();
@@ -849,7 +866,6 @@
 
       if (roomBookings.length === 0) return 'ว่าง';
 
-      // ค้นหาว่าช่วงเวลาปัจจุบัน ตรงกับคิวการจองใดในระบบหรือไม่
       let activeBooking = null;
       let pendingBooking = null;
 
@@ -862,7 +878,6 @@
         const startM = sh * 60 + sm;
         const endM = eh * 60 + em;
 
-        // เช็คว่าเวลาปัจจุบันอยู่ระหว่างเริ่มและสิ้นสุดการจองนี้หรือไม่
         if (currentMins >= startM && currentMins < endMins) {
           activeBooking = b;
           break;
