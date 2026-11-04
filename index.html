@@ -59,59 +59,82 @@
 
   <!-- Header Bar -->
   <header class="bg-chula-main text-white shadow-md sticky top-0 z-40">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-      <div class="flex items-center space-x-3 cursor-pointer" onclick="showPage('pageRoomList')">
-        <i class="fa-solid fa-book-bookmark text-2xl"></i>
-        <div>
-          <h1 class="text-lg font-bold leading-tight">จองห้องประชุม ห้องสมุดวิศวะ</h1>
-          <p class="text-xs text-red-200">ENG Library Chula</p>
+    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      
+      <!-- Logo & Title -->
+      <div class="flex items-center space-x-3 cursor-pointer w-full sm:w-auto justify-between sm:justify-start" onclick="showPage('pageRoomList')">
+        <div class="flex items-center space-x-3">
+          <i class="fa-solid fa-book-bookmark text-2xl"></i>
+          <div>
+            <h1 class="text-base sm:text-lg font-bold leading-tight">จองห้องประชุม ห้องสมุดวิศวะ</h1>
+            <p class="text-xs text-red-200">ENG Library Chula</p>
+          </div>
+        </div>
+        
+        <!-- Mobile Right Controls -->
+        <div class="flex items-center space-x-2 sm:hidden">
+          <div class="relative">
+            <button onclick="toggleNotiDropdown()" class="p-1.5 rounded-full hover:bg-chula-hover transition relative">
+              <i class="fa-solid fa-bell text-base"></i>
+              <span id="notiBadgeMob" class="hidden absolute top-0 right-0 w-3.5 h-3.5 bg-yellow-400 text-black font-bold text-[9px] rounded-full flex items-center justify-center">0</span>
+            </button>
+          </div>
+          <button onclick="toggleTheme()" class="p-1.5 rounded-full hover:bg-chula-hover transition">
+            <i id="themeIconMob" class="fa-solid fa-moon text-base"></i>
+          </button>
         </div>
       </div>
 
-      <div class="flex items-center space-x-3">
-        <!-- Notification Bell Hub -->
-        <div class="relative" id="notiBellContainer">
-          <button onclick="toggleNotiDropdown()" class="p-2 rounded-full hover:bg-chula-hover transition relative">
-            <i class="fa-solid fa-bell text-lg"></i>
-            <span id="notiBadge" class="hidden absolute top-0 right-0 w-4 h-4 bg-yellow-400 text-black font-bold text-[10px] rounded-full flex items-center justify-center">0</span>
+      <!-- Right Controls & Auth -->
+      <div class="flex items-center justify-between w-full sm:w-auto sm:space-x-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-chula-hover">
+        
+        <!-- Desktop Notification & Theme -->
+        <div class="hidden sm:flex items-center space-x-2">
+          <div class="relative">
+            <button onclick="toggleNotiDropdown()" class="p-2 rounded-full hover:bg-chula-hover transition relative">
+              <i class="fa-solid fa-bell text-lg"></i>
+              <span id="notiBadge" class="hidden absolute top-0 right-0 w-4 h-4 bg-yellow-400 text-black font-bold text-[10px] rounded-full flex items-center justify-center">0</span>
+            </button>
+          </div>
+          <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-chula-hover transition">
+            <i id="themeIcon" class="fa-solid fa-moon text-lg"></i>
           </button>
+        </div>
 
-          <div id="notiDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white dark:bg-chula-darkCard rounded-xl shadow-2xl border dark:border-gray-800 text-gray-800 dark:text-gray-100 z-50 p-3">
-            <div class="font-bold border-b pb-2 mb-2 flex justify-between items-center text-sm">
-              <span><i class="fa-solid fa-bell text-chula-main mr-1"></i> คำขอและการแจ้งเตือน</span>
-              <div class="flex items-center space-x-2">
-                <button onclick="clearRespondedNotifications()" class="text-[10px] text-gray-400 hover:text-red-500 underline">ล้างคำขอที่ตอบแล้ว</button>
-                <span id="notiCountLabel" class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">0</span>
-              </div>
+        <!-- Notification Dropdown -->
+        <div id="notiDropdown" class="hidden absolute right-4 sm:right-auto mt-2 w-80 bg-white dark:bg-chula-darkCard rounded-xl shadow-2xl border dark:border-gray-800 text-gray-800 dark:text-gray-100 z-50 p-3">
+          <div class="font-bold border-b pb-2 mb-2 flex justify-between items-center text-sm">
+            <span><i class="fa-solid fa-bell text-chula-main mr-1"></i> คำขอและการแจ้งเตือน</span>
+            <div class="flex items-center space-x-2">
+              <button onclick="clearRespondedNotifications()" class="text-[10px] text-gray-400 hover:text-red-500 underline">ล้างคำขอที่ตอบแล้ว</button>
+              <span id="notiCountLabel" class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">0</span>
             </div>
-            <div id="notiList" class="space-y-2 max-h-64 overflow-y-auto text-xs divide-y dark:divide-gray-800">
-              <p class="text-center text-gray-400 py-3">ไม่มีคำขอที่ค้างอยู่</p>
-            </div>
+          </div>
+          <div id="notiList" class="space-y-2 max-h-64 overflow-y-auto text-xs divide-y dark:divide-gray-800">
+            <p class="text-center text-gray-400 py-3">ไม่มีคำขอที่ค้างอยู่</p>
           </div>
         </div>
 
-        <!-- Theme Toggle -->
-        <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-chula-hover transition">
-          <i id="themeIcon" class="fa-solid fa-moon text-lg"></i>
-        </button>
-
         <!-- Auth Corner -->
-        <div id="authCorner">
+        <div id="authCorner" class="w-full sm:w-auto flex justify-end">
           <button id="btnLoginCorner" onclick="openLoginModal()" class="px-3 py-1.5 bg-white text-chula-main text-xs font-bold rounded-lg hover:bg-gray-100 shadow transition flex items-center space-x-1">
             <i class="fa-solid fa-right-to-bracket"></i>
             <span>เข้าสู่ระบบ</span>
           </button>
-          <div id="userInfoCorner" class="hidden text-xs bg-chula-hover px-3 py-1.5 rounded-lg flex items-center space-x-2">
-            <i id="userIconRole" class="fa-solid fa-user-graduate text-yellow-300"></i>
+          <div id="userInfoCorner" class="hidden text-xs bg-chula-hover px-2.5 py-1.5 rounded-lg flex items-center space-x-2">
+            <i id="userIconRole" class="fa-solid fa-user-graduate text-yellow-300 shrink-0"></i>
             <span id="userEmailSpan" class="font-mono font-semibold"></span>
-            <button onclick="logout()" class="text-red-300 hover:text-white underline ml-1">(ออก)</button>
+            <button onclick="logout()" class="text-red-300 hover:text-white underline ml-1 shrink-0">(ออก)</button>
           </div>
         </div>
+
       </div>
     </div>
+
+    <!-- Announcement Sub-bar -->
     <div class="bg-chula-hover text-center py-1.5 px-4 text-xs flex items-center justify-center space-x-2">
-      <i class="fa-solid fa-bullhorn text-yellow-300"></i>
-      <span>ต่อเวลาห้อง ย้ายห้อง ติดต่อเจ้าหน้าที่เคาน์เตอร์หรือทักข้อความในไลน์ได้เลยครับ</span>
+      <i class="fa-solid fa-bullhorn text-yellow-300 shrink-0"></i>
+      <span class="truncate">ต่อเวลาห้อง ย้ายห้อง ติดต่อเจ้าหน้าที่เคาน์เตอร์หรือทักข้อความในไลน์ได้เลยครับ</span>
     </div>
   </header>
 
@@ -123,12 +146,12 @@
         <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
       </h2>
       <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
-        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21) หรือพิมพ์ student_admin.chula.ac.th สำหรับแอดมิน
+        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21)
       </p>
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-medium mb-1">อีเมลนิสิต / แอดมิน <span class="text-red-500">*</span></label>
-          <input type="text" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th หรือ student_admin.chula.ac.th"
+          <input type="text" id="loginEmail" required placeholder="Ex. 6630xxxx21@student.chula.ac.th"
             class="w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-chula-main outline-none text-sm">
         </div>
         <p id="loginError" class="text-xs text-red-500 hidden"></p>
@@ -374,12 +397,14 @@
       if (isLoggedIn && currentUser) {
         document.getElementById('btnLoginCorner').classList.add('hidden');
         document.getElementById('userInfoCorner').classList.remove('hidden');
-        document.getElementById('userEmailSpan').innerText = currentUser.email;
 
+        // แสดงผลเฉพาะรหัส 10 หลัก (สำหรับนิสิต) หรือคำว่า admin (สำหรับแอดมิน)
         if (currentUser.isAdmin) {
+          document.getElementById('userEmailSpan').innerText = "admin";
           document.getElementById('userIconRole').className = "fa-solid fa-shield-halved text-yellow-300";
           adminBanner.classList.remove('hidden');
         } else {
+          document.getElementById('userEmailSpan').innerText = currentUser.studentId;
           document.getElementById('userIconRole').className = "fa-solid fa-user-graduate text-yellow-300";
           adminBanner.classList.add('hidden');
           document.getElementById('studentId1').value = currentUser.studentId;
@@ -441,7 +466,9 @@
 
     function toggleTheme() {
       const isDark = document.documentElement.classList.toggle('dark');
-      document.getElementById('themeIcon').className = isDark ? 'fa-solid fa-sun text-yellow-400 text-lg' : 'fa-solid fa-moon text-lg';
+      const iconClass = isDark ? 'fa-solid fa-sun text-yellow-400 text-base sm:text-lg' : 'fa-solid fa-moon text-base sm:text-lg';
+      document.getElementById('themeIcon').className = iconClass;
+      document.getElementById('themeIconMob').className = iconClass;
     }
 
     function setupFirestoreListeners() {
@@ -460,7 +487,6 @@
       });
     }
 
-    // ลบคิวออกเฉพาะเมื่อ "ผ่านพ้นวันนั้นไปแล้ว (จบวัน)" ไม่ลบระหว่างวัน ป้องกันช่องโหว่จองซ้ำ
     async function cleanExpiredData() {
       const now = new Date();
       const todayISO = formatDateISO(now);
@@ -562,14 +588,18 @@
 
       const totalCount = incomingReqs.length + mySubmittedReqs.length;
       const badge = document.getElementById('notiBadge');
+      const badgeMob = document.getElementById('notiBadgeMob');
       const countLabel = document.getElementById('notiCountLabel');
 
       if (totalCount > 0) {
         badge.innerText = totalCount;
         badge.classList.remove('hidden');
+        badgeMob.innerText = totalCount;
+        badgeMob.classList.remove('hidden');
         countLabel.innerText = `${totalCount} รายการ`;
       } else {
         badge.classList.add('hidden');
+        badgeMob.classList.add('hidden');
         countLabel.innerText = "0";
       }
 
@@ -674,7 +704,6 @@
       alert('✅ ยอมรับผู้เข้าร่วมห้องแชร์สำเร็จ');
     }
 
-    // ถ่ายโอนสิทธิ์การจองให้ผู้ขอคิวอย่างถูกต้องครบถ้วน (ไม่หายกลายเป็นห้องว่าง)
     async function approveQueueRequest(reqId) {
       const req = realTimeRequests.find(r => r.id === reqId);
       if (!req) return;
@@ -687,7 +716,6 @@
 
       const reqMins = timeToMins(req.reqEndTime) - timeToMins(req.reqStartTime);
 
-      // ตรวจโควตาผู้ขอใหม่
       const requesterUsedMins = getUserTotalBookedMinutesOnDate(reqStudentId, req.date, parentBooking.id);
       if (requesterUsedMins + reqMins > 120) {
         alert('❌ ผู้ขอมีโควตาการจองสะสมเกิน 2 ชั่วโมงในวันนี้แล้ว ไม่สามารถอนุมัติได้');
@@ -699,7 +727,6 @@
         return;
       }
 
-      // อัปเดตถ่ายโอนข้อมูลให้ผู้ยื่นขอคิวอย่างสมบูรณ์
       await db.collection("bookings").doc(parentBooking.id).update({
         bookerEmail: reqEmail,
         bookerName: `นิสิต (${reqStudentId})`,
