@@ -123,12 +123,12 @@
         <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
       </h2>
       <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
-        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21)
+        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21) หรือพิมพ์ student_admin.chula.ac.th สำหรับแอดมิน
       </p>
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
           <label class="block text-xs font-medium mb-1">อีเมลนิสิต / แอดมิน <span class="text-red-500">*</span></label>
-          <input type="text" id="loginEmail" required placeholder="Ex. 6630xxxx21@student.chula.ac.th"
+          <input type="text" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th หรือ student_admin.chula.ac.th"
             class="w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-chula-main outline-none text-sm">
         </div>
         <p id="loginError" class="text-xs text-red-500 hidden"></p>
@@ -352,7 +352,6 @@
       checkStoredUserSession();
       initDates();
       setupFirestoreListeners();
-      // อัปเดตสถานะเป๊ะๆ ทุก 10 วินาที
       setInterval(() => {
         if (selectedDateStr === formatDateISO(new Date())) {
           renderRealtimeOverviewGrid();
@@ -461,40 +460,19 @@
       });
     }
 
+    // ลบคิวออกเฉพาะเมื่อ "ผ่านพ้นวันนั้นไปแล้ว (จบวัน)" ไม่ลบระหว่างวัน ป้องกันช่องโหว่จองซ้ำ
     async function cleanExpiredData() {
       const now = new Date();
       const todayISO = formatDateISO(now);
-      const currentMins = now.getHours() * 60 + now.getMinutes();
 
       realTimeBookings.forEach(async (b) => {
-        let isExpired = false;
         if (b.date < todayISO) {
-          isExpired = true;
-        } else if (b.date === todayISO) {
-          const endMins = timeToMins(b.endTime);
-          if (currentMins >= endMins) {
-            isExpired = true;
-          }
-        }
-        if (isExpired) {
           await db.collection("bookings").doc(b.id).delete();
         }
       });
 
       realTimeRequests.forEach(async (r) => {
-        let isExpired = false;
         if (r.date < todayISO) {
-          isExpired = true;
-        } else if (r.date === todayISO) {
-          const endTimeStr = r.reqEndTime || r.timeSlot;
-          if (endTimeStr) {
-            const endMins = timeToMins(endTimeStr);
-            if (currentMins >= endMins) {
-              isExpired = true;
-            }
-          }
-        }
-        if (isExpired) {
           await db.collection("queue_requests").doc(r.id).delete();
         }
       });
@@ -696,6 +674,7 @@
       alert('✅ ยอมรับผู้เข้าร่วมห้องแชร์สำเร็จ');
     }
 
+    // ถ่ายโอนสิทธิ์การจองให้ผู้ขอคิวอย่างถูกต้องครบถ้วน (ไม่หายกลายเป็นห้องว่าง)
     async function approveQueueRequest(reqId) {
       const req = realTimeRequests.find(r => r.id === reqId);
       if (!req) return;
@@ -708,7 +687,7 @@
 
       const reqMins = timeToMins(req.reqEndTime) - timeToMins(req.reqStartTime);
 
-      // ตรวจโควตาผู้ขอใหม่โดยยกเว้นการนับคิวห้องเดิมนี้
+      // ตรวจโควตาผู้ขอใหม่
       const requesterUsedMins = getUserTotalBookedMinutesOnDate(reqStudentId, req.date, parentBooking.id);
       if (requesterUsedMins + reqMins > 120) {
         alert('❌ ผู้ขอมีโควตาการจองสะสมเกิน 2 ชั่วโมงในวันนี้แล้ว ไม่สามารถอนุมัติได้');
@@ -720,11 +699,14 @@
         return;
       }
 
+      // อัปเดตถ่ายโอนข้อมูลให้ผู้ยื่นขอคิวอย่างสมบูรณ์
       await db.collection("bookings").doc(parentBooking.id).update({
         bookerEmail: reqEmail,
         bookerName: `นิสิต (${reqStudentId})`,
         startTime: req.reqStartTime,
         endTime: req.reqEndTime,
+        status: 'occupied',
+        isShareable: false,
         studentIds: [reqStudentId],
         studentDetails: [{ studentId: reqStudentId, email: reqEmail, startTime: req.reqStartTime, endTime: req.reqEndTime }]
       });
@@ -857,12 +839,10 @@
       return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
     }
 
-    // ฟังก์ชันเช็คสถานะห้อง ณ เวลาปัจจุบันแบบ Real-time ตรงเป๊ะ 100%
     function getRoomCurrentRealtimeStatus(roomId, dateStr) {
       const now = new Date();
       const currentMins = now.getHours() * 60 + now.getMinutes();
 
-      // ดึงคิวการจองของห้องนั้นๆ ที่ตรงกับวันที่เปิดดู
       const roomBookings = realTimeBookings.filter(b => b.roomId === roomId && b.date === dateStr);
       if (roomBookings.length === 0) return 'ว่าง';
 
@@ -872,7 +852,6 @@
         const startM = timeToMins(b.startTime);
         const endM = timeToMins(b.endTime);
 
-        // เช็คว่าเวลาปัจจุบันตกอยู่ในช่วงเวลานี้หรือไม่
         if (currentMins >= startM && currentMins < endM) {
           activeBooking = b;
           break;
@@ -1412,7 +1391,6 @@
 
     function closeModal() { document.getElementById('modalOverlay').classList.add('hidden'); }
     
-    // แปลง Date Object เป็น YYYY-MM-DD แบบการันตีความถูกต้องของปี ค.ศ.
     function formatDateISO(d) { 
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
