@@ -797,7 +797,13 @@
           `;
         } else {
           const st = libInfo.isClosed ? 'ห้องปิด' : getRoomOverallStatus(room.id, selectedDateStr);
-          let badgeColor = st === 'ว่าง' ? 'bg-emerald-500' : (st === 'รอการยืนยัน' ? 'bg-amber-400' : (st === 'แชร์ร่วมกันได้' ? 'bg-pink-400' : 'bg-gray-400'));
+          let badgeColor = "";
+          if (st === 'ว่าง') badgeColor = 'bg-emerald-500';
+          else if (st === 'รอการยืนยัน') badgeColor = 'bg-amber-400';
+          else if (st === 'แชร์ร่วมกันได้') badgeColor = 'bg-pink-400';
+          else if (st === 'ไม่ว่าง') badgeColor = 'bg-red-500';
+          else badgeColor = 'bg-gray-400'; // สำหรับห้องปิด
+
           return `
             <div class="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
               <div class="flex items-center space-x-3">
