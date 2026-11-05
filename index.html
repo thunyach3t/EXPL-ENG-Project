@@ -146,12 +146,12 @@
         <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
       </h2>
       <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
-        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21)
+        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21) หรือพิมพ์ student_admin.chula.ac.th สำหรับแอดมิน
       </p>
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-medium mb-1">อีเมลนิสิต <span class="text-red-500">*</span></label>
-          <input type="text" id="loginEmail" required placeholder="Ex. 6630xxxx21@student.chula.ac.th"
+          <label class="block text-xs font-medium mb-1">อีเมลนิสิต / แอดมิน <span class="text-red-500">*</span></label>
+          <input type="text" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th หรือ student_admin.chula.ac.th"
             class="w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-chula-main outline-none text-sm">
         </div>
         <p id="loginError" class="text-xs text-red-500 hidden"></p>
@@ -398,7 +398,6 @@
         document.getElementById('btnLoginCorner').classList.add('hidden');
         document.getElementById('userInfoCorner').classList.remove('hidden');
 
-        // แสดงผลเฉพาะรหัส 10 หลัก (สำหรับนิสิต) หรือคำว่า admin (สำหรับแอดมิน)
         if (currentUser.isAdmin) {
           document.getElementById('userEmailSpan').innerText = "admin";
           document.getElementById('userIconRole').className = "fa-solid fa-shield-halved text-yellow-300";
@@ -866,13 +865,22 @@
       return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
     }
 
+    // ฟังก์ชันประมวลผลสถานะห้องตามช่วงเวลาอย่างแม่นยำ 100%
     function getRoomCurrentRealtimeStatus(roomId, dateStr) {
-      const now = new Date();
-      const currentMins = now.getHours() * 60 + now.getMinutes();
-
       const roomBookings = realTimeBookings.filter(b => b.roomId === roomId && b.date === dateStr);
       if (roomBookings.length === 0) return 'ว่าง';
 
+      const now = new Date();
+      const todayISO = formatDateISO(now);
+      const isToday = (dateStr === todayISO);
+
+      // ถ้าเป็นวันพรุ่งนี้หรืออนาคต และไม่มีการจอง ณ เวลานั้น
+      if (!isToday) {
+        return 'ว่าง';
+      }
+
+      // ถ้าเป็นวันนี้ นำเวลาปัจจุบัน (นาที) มาเปรียบเทียบ
+      const currentMins = now.getHours() * 60 + now.getMinutes();
       let activeBooking = null;
 
       for (let b of roomBookings) {
@@ -942,36 +950,25 @@
       const isToday = (selectedDateStr === todayStr);
 
       container.innerHTML = rooms.map(room => {
-        if (!isToday) {
-          return `
-            <div class="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
-              <span class="font-bold text-sm text-gray-800 dark:text-gray-200">${room.name}</span>
-              <button onclick="openRoomTimeSlots('${room.id}', '${room.name}')" class="text-chula-main dark:text-red-400 font-bold text-xs flex items-center space-x-1">
-                <span>จองออนไลน์</span><i class="fa-solid fa-chevron-right text-[10px]"></i>
-              </button>
-            </div>
-          `;
-        } else {
-          const st = libInfo.isClosed ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
-          let badgeColor = "";
-          if (st === 'ว่าง') badgeColor = 'bg-emerald-500';
-          else if (st === 'รอการยืนยัน') badgeColor = 'bg-amber-400';
-          else if (st === 'แชร์ร่วมกันได้') badgeColor = 'bg-pink-400';
-          else if (st === 'ไม่ว่าง') badgeColor = 'bg-red-500';
-          else badgeColor = 'bg-gray-400';
+        const st = libInfo.isClosed ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
+        let badgeColor = "";
+        if (st === 'ว่าง') badgeColor = 'bg-emerald-500';
+        else if (st === 'รอการยืนยัน') badgeColor = 'bg-amber-400';
+        else if (st === 'แชร์ร่วมกันได้') badgeColor = 'bg-pink-400';
+        else if (st === 'ไม่ว่าง') badgeColor = 'bg-red-500';
+        else badgeColor = 'bg-gray-400';
 
-          return `
-            <div class="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
-              <div class="flex items-center space-x-3">
-                <span class="w-3 h-3 rounded-full ${badgeColor}"></span>
-                <span class="font-bold text-sm">${room.name} <span class="text-xs text-gray-500 font-normal">(${st})</span></span>
-              </div>
-              <button onclick="openRoomTimeSlots('${room.id}', '${room.name}')" class="text-chula-main dark:text-red-400 font-bold text-xs flex items-center space-x-1">
-                <span>จองออนไลน์</span><i class="fa-solid fa-chevron-right text-[10px]"></i>
-              </button>
+        return `
+          <div class="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
+            <div class="flex items-center space-x-3">
+              <span class="w-3 h-3 rounded-full ${badgeColor}"></span>
+              <span class="font-bold text-sm">${room.name} <span class="text-xs text-gray-500 font-normal">(${st})</span></span>
             </div>
-          `;
-        }
+            <button onclick="openRoomTimeSlots('${room.id}', '${room.name}')" class="text-chula-main dark:text-red-400 font-bold text-xs flex items-center space-x-1">
+              <span>จองออนไลน์</span><i class="fa-solid fa-chevron-right text-[10px]"></i>
+            </button>
+          </div>
+        `;
       }).join('');
     }
 
