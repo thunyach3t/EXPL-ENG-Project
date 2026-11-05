@@ -205,7 +205,7 @@
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center space-x-2 text-base font-bold">
           <i class="fa-solid fa-chart-simple text-chula-main dark:text-red-400"></i>
-          <span>สถานะห้องตอนนี้ (Real-time Overview)[cite: 11]</span>
+          <span>สถานะห้องตอนนี้ (Real-time Overview)</span>
         </div>
         <div class="flex flex-wrap gap-2 text-xs font-semibold">
           <span class="px-2.5 py-1 rounded-full border border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center gap-1.5">
@@ -354,7 +354,7 @@
   </main>
 
   <script>
-    const VALID_YEARS = ['66', '67', '68', '69']; // 4 ปีล่าสุด
+    const VALID_YEARS = ['66', '67', '68', '69'];
 
     const ALL_ROOMS = [
       { id: 'sem_a', name: 'Seminar Room A', category: 'Seminar Room' },
@@ -865,35 +865,28 @@
       return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
     }
 
-    // แก้ไขฟังก์ชันเช็คสถานะ ให้ถ้าไม่มีคนจอง คืนค่าเป็น 'ว่าง' อย่างถูกต้องเสมอ
+    // แก้ไขฟังก์ชันเช็คสถานะห้องเวลานี้แบบกระชับ ชัดเจน ไม่ตกหลุมบั๊ก
     function getRoomCurrentRealtimeStatus(roomId, dateStr) {
       const roomBookings = realTimeBookings.filter(b => b.roomId === roomId && b.date === dateStr);
-      if (roomBookings.length === 0) return 'ว่าง';
+      if (!roomBookings || roomBookings.length === 0) return 'ว่าง';
 
       const now = new Date();
       const todayISO = formatDateISO(now);
-      const isToday = (dateStr === todayISO);
 
-      if (!isToday) {
-        return 'ว่าง';
-      }
+      // ถ้าไม่ใช่วันนี้ คืนค่า 'ว่าง'
+      if (dateStr !== todayISO) return 'ว่าง';
 
       const currentMins = now.getHours() * 60 + now.getMinutes();
-      let activeBooking = null;
 
+      // วนลูปเช็คช่วงเวลาจองปัจจุบัน
       for (let b of roomBookings) {
         const startM = timeToMins(b.startTime);
         const endM = timeToMins(b.endTime);
 
         if (currentMins >= startM && currentMins < endM) {
-          activeBooking = b;
-          break;
+          if (b.isShareable) return 'แชร์ร่วมกันได้';
+          return 'ไม่ว่าง';
         }
-      }
-
-      if (activeBooking) {
-        if (activeBooking.isShareable) return 'แชร์ร่วมกันได้';
-        return 'ไม่ว่าง';
       }
 
       return 'ว่าง';
@@ -908,6 +901,8 @@
       document.getElementById('libraryStatusBanner').className = `text-xs text-center font-semibold py-1.5 px-3 rounded-md ${libInfo.isClosed ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200'}`;
 
       const todayStr = formatDateISO(new Date());
+
+      // ถ้าเป็นวันพรุ่งนี้ ซ่อน Real-time Overview ทั้งกล่องทันที
       if (selectedDateStr !== todayStr) {
         container.classList.add('hidden');
         return;
@@ -916,8 +911,7 @@
       }
 
       grid.innerHTML = ALL_ROOMS.map(room => {
-        // หากนอกเวลาทำการ ให้ขึ้นสถานะห้องปิดเฉพาะเมื่ออยู่นอกเวลาจริงๆ ไม่งั้นให้เช็คสถานะห้องปกติ
-        let status = (libInfo.isClosed && getRoomCurrentRealtimeStatus(room.id, selectedDateStr) === 'ว่าง') ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
+        let status = libInfo.isClosed ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
         let colorClasses = "";
 
         if (status === 'ห้องปิด') colorClasses = "bg-gray-100 border-gray-400 text-gray-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400";
@@ -945,21 +939,35 @@
     function renderCategory(containerId, rooms) {
       const container = document.getElementById(containerId);
       const libInfo = getLibraryStatusInfo();
+      const todayStr = formatDateISO(new Date());
+      const isToday = (selectedDateStr === todayStr);
 
       container.innerHTML = rooms.map(room => {
-        let st = (libInfo.isClosed && getRoomCurrentRealtimeStatus(room.id, selectedDateStr) === 'ว่าง') ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
-        let badgeColor = "";
-        if (st === 'ว่าง') badgeColor = 'bg-emerald-500';
-        else if (st === 'รอการยืนยัน') badgeColor = 'bg-amber-400';
-        else if (st === 'แชร์ร่วมกันได้') badgeColor = 'bg-pink-400';
-        else if (st === 'ไม่ว่าง') badgeColor = 'bg-red-500';
-        else badgeColor = 'bg-gray-400';
+        let st = '';
+        let badgeHtml = '';
+
+        // แสดงสถานะเฉพาะเมื่อดูของ "วันนี้" เท่านั้น
+        if (isToday) {
+          st = libInfo.isClosed ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
+          let badgeColor = "bg-gray-400";
+          if (st === 'ว่าง') badgeColor = 'bg-emerald-500';
+          else if (st === 'รอการยืนยัน') badgeColor = 'bg-amber-400';
+          else if (st === 'แชร์ร่วมกันได้') badgeColor = 'bg-pink-400';
+          else if (st === 'ไม่ว่าง') badgeColor = 'bg-red-500';
+
+          badgeHtml = `
+            <span class="w-3 h-3 rounded-full ${badgeColor}"></span>
+            <span class="font-bold text-sm">${room.name} <span class="text-xs text-gray-500 font-normal">(${st})</span></span>
+          `;
+        } else {
+          // ถ้าเลือก "พรุ่งนี้" จะแสดงเฉพาะชื่อห้อง ปล่อยโล่ง ไม่โชว์คำว่าว่างหรือไม่อย่างแน่นอน
+          badgeHtml = `<span class="font-bold text-sm">${room.name}</span>`;
+        }
 
         return `
           <div class="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
             <div class="flex items-center space-x-3">
-              <span class="w-3 h-3 rounded-full ${badgeColor}"></span>
-              <span class="font-bold text-sm">${room.name} <span class="text-xs text-gray-500 font-normal">(${st})</span></span>
+              ${badgeHtml}
             </div>
             <button onclick="openRoomTimeSlots('${room.id}', '${room.name}')" class="text-chula-main dark:text-red-400 font-bold text-xs flex items-center space-x-1">
               <span>จองออนไลน์</span><i class="fa-solid fa-chevron-right text-[10px]"></i>
