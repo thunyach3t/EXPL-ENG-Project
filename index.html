@@ -205,7 +205,7 @@
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center space-x-2 text-base font-bold">
           <i class="fa-solid fa-chart-simple text-chula-main dark:text-red-400"></i>
-          <span>สถานะห้องตอนนี้ (Real-time Overview)</span>
+          <span>สถานะห้องตอนนี้ (Real-time Overview)[cite: 11]</span>
         </div>
         <div class="flex flex-wrap gap-2 text-xs font-semibold">
           <span class="px-2.5 py-1 rounded-full border border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center gap-1.5">
@@ -865,7 +865,7 @@
       return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
     }
 
-    // ฟังก์ชันประมวลผลสถานะห้องตามช่วงเวลาอย่างแม่นยำ 100%
+    // แก้ไขฟังก์ชันเช็คสถานะ ให้ถ้าไม่มีคนจอง คืนค่าเป็น 'ว่าง' อย่างถูกต้องเสมอ
     function getRoomCurrentRealtimeStatus(roomId, dateStr) {
       const roomBookings = realTimeBookings.filter(b => b.roomId === roomId && b.date === dateStr);
       if (roomBookings.length === 0) return 'ว่าง';
@@ -874,12 +874,10 @@
       const todayISO = formatDateISO(now);
       const isToday = (dateStr === todayISO);
 
-      // ถ้าเป็นวันพรุ่งนี้หรืออนาคต และไม่มีการจอง ณ เวลานั้น
       if (!isToday) {
         return 'ว่าง';
       }
 
-      // ถ้าเป็นวันนี้ นำเวลาปัจจุบัน (นาที) มาเปรียบเทียบ
       const currentMins = now.getHours() * 60 + now.getMinutes();
       let activeBooking = null;
 
@@ -918,7 +916,8 @@
       }
 
       grid.innerHTML = ALL_ROOMS.map(room => {
-        let status = libInfo.isClosed ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
+        // หากนอกเวลาทำการ ให้ขึ้นสถานะห้องปิดเฉพาะเมื่ออยู่นอกเวลาจริงๆ ไม่งั้นให้เช็คสถานะห้องปกติ
+        let status = (libInfo.isClosed && getRoomCurrentRealtimeStatus(room.id, selectedDateStr) === 'ว่าง') ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
         let colorClasses = "";
 
         if (status === 'ห้องปิด') colorClasses = "bg-gray-100 border-gray-400 text-gray-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400";
@@ -946,11 +945,9 @@
     function renderCategory(containerId, rooms) {
       const container = document.getElementById(containerId);
       const libInfo = getLibraryStatusInfo();
-      const todayStr = formatDateISO(new Date());
-      const isToday = (selectedDateStr === todayStr);
 
       container.innerHTML = rooms.map(room => {
-        const st = libInfo.isClosed ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
+        let st = (libInfo.isClosed && getRoomCurrentRealtimeStatus(room.id, selectedDateStr) === 'ว่าง') ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
         let badgeColor = "";
         if (st === 'ว่าง') badgeColor = 'bg-emerald-500';
         else if (st === 'รอการยืนยัน') badgeColor = 'bg-amber-400';
