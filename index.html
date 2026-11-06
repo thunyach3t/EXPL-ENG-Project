@@ -146,12 +146,12 @@
         <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
       </h2>
       <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
-        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21)
+        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21) หรือพิมพ์ student_admin.chula.ac.th สำหรับแอดมิน
       </p>
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-medium mb-1">อีเมลนิสิต <span class="text-red-500">*</span></label>
-          <input type="text" id="loginEmail" required placeholder="Ex. 6630xxxx21@student.chula.ac.th"
+          <label class="block text-xs font-medium mb-1">อีเมลนิสิต / แอดมิน <span class="text-red-500">*</span></label>
+          <input type="text" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th หรือ student_admin.chula.ac.th"
             class="w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-chula-main outline-none text-sm">
         </div>
         <p id="loginError" class="text-xs text-red-500 hidden"></p>
@@ -475,13 +475,11 @@
         realTimeBookings = [];
         snapshot.forEach(doc => {
           const data = doc.data();
-          // ตัวกรองความปลอดภัย: หากเจอข้อมูลขยะที่จองแบบเหมาทั้งวัน (เช่น 00:00 ถึง 23:59 หรือเกิน 4 ชั่วโมง) ให้ระบบลบทิ้งทันทีอัตโนมัติ
           const startM = timeToMins(data.startTime);
           const endM = timeToMins(data.endTime);
           const duration = endM - startM;
 
           if (duration > 240 || (data.startTime === "00:00" && data.endTime === "23:59")) {
-            // ลบข้อมูลขยะนี้ออกจากฐานข้อมูลทันที
             db.collection("bookings").doc(doc.id).delete();
             return;
           }
@@ -519,6 +517,7 @@
     }
 
     function getUserTotalBookedMinutesOnDate(studentId, dateStr, excludeBookingId = null) {
+      if (!studentId) return 0;
       let totalMins = 0;
       realTimeBookings.forEach(b => {
         if (b.id === excludeBookingId) return;
@@ -545,6 +544,7 @@
     }
 
     function hasUserConflictOnTimeSlot(studentId, dateStr, start, end, excludeBookingId = null) {
+      if (!studentId) return false;
       let conflict = false;
       realTimeBookings.forEach(b => {
         if (b.id === excludeBookingId) return;
@@ -1047,8 +1047,12 @@
       }
     }
 
+    // ฟังก์ชันเลือกเวลามีการดักจับ currentUser เพื่อป้องกันโค้ดค้างเรียบร้อย
     function selectTimeSlotForBooking(startTime) {
-      if (!currentUser) { openLoginModal(); return; }
+      if (!currentUser) { 
+        openLoginModal(); 
+        return; 
+      }
       if (currentUser.isAdmin) {
         alert('Admin กรุณาใช้เมนู Walk-in Panel');
         return;
@@ -1088,7 +1092,7 @@
       selectedStartTime = startTime;
       
       const dateParts = selectedDateStr.split('-');
-      const targetDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+      const targetDate = new Date(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10));
       document.getElementById('formDateDisplay').value = formatDateTh(targetDate);
       document.getElementById('formRoomDisplay').value = selectedRoom.name;
       document.getElementById('startTimeDisplay').value = `${startTime} น.`;
@@ -1096,9 +1100,10 @@
       const selectEnd = document.getElementById('endTimeSelect');
       selectEnd.innerHTML = '';
       const startMins = timeToMins(startTime);
-      const isWeekend = targetDate.getDay() % 6 === 0;
+      const isWeekend = (targetDate.getDay() === 0 || targetDate.getDay() === 6);
       
-      const usedMins = getUserTotalBookedMinutesOnDate(currentUser.studentId, selectedDateStr);
+      const stdId = currentUser ? currentUser.studentId : null;
+      const usedMins = getUserTotalBookedMinutesOnDate(stdId, selectedDateStr);
       const maxEndMins = Math.min(startMins + Math.min(120, 120 - usedMins), isWeekend ? 17 * 60 : 19 * 60);
 
       for (let m = startMins + 15; m <= maxEndMins; m += 15) {
