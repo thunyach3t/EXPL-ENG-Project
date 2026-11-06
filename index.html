@@ -146,12 +146,12 @@
         <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
       </h2>
       <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
-        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21)
+        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21) หรือพิมพ์ student_admin.chula.ac.th สำหรับแอดมิน
       </p>
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
-          <label class="block text-xs font-medium mb-1">อีเมลนิสิต <span class="text-red-500">*</span></label>
-          <input type="text" id="loginEmail" required placeholder="Ex. 6630xxxx21@student.chula.ac.th"
+          <label class="block text-xs font-medium mb-1">อีเมลนิสิต / แอดมิน <span class="text-red-500">*</span></label>
+          <input type="text" id="loginEmail" required placeholder="6630xxxx21@student.chula.ac.th หรือ student_admin.chula.ac.th"
             class="w-full px-4 py-2 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white focus:ring-2 focus:ring-chula-main outline-none text-sm">
         </div>
         <p id="loginError" class="text-xs text-red-500 hidden"></p>
@@ -473,7 +473,22 @@
     function setupFirestoreListeners() {
       db.collection("bookings").onSnapshot(snapshot => {
         realTimeBookings = [];
-        snapshot.forEach(doc => realTimeBookings.push({ id: doc.id, ...doc.data() }));
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          // ตัวกรองความปลอดภัย: หากเจอข้อมูลขยะที่จองแบบเหมาทั้งวัน (เช่น 00:00 ถึง 23:59 หรือเกิน 4 ชั่วโมง) ให้ระบบลบทิ้งทันทีอัตโนมัติ
+          const startM = timeToMins(data.startTime);
+          const endM = timeToMins(data.endTime);
+          const duration = endM - startM;
+
+          if (duration > 240 || (data.startTime === "00:00" && data.endTime === "23:59")) {
+            // ลบข้อมูลขยะนี้ออกจากฐานข้อมูลทันที
+            db.collection("bookings").doc(doc.id).delete();
+            return;
+          }
+
+          realTimeBookings.push({ id: doc.id, ...data });
+        });
+
         cleanExpiredData();
         renderAllOverviewGrids();
         updateNotificationBellHub();
@@ -865,7 +880,6 @@
       return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
     }
 
-    // แก้ไขฟังก์ชันเช็คสถานะห้องเวลานี้แบบกระชับ ชัดเจน ไม่ตกหลุมบั๊ก
     function getRoomCurrentRealtimeStatus(roomId, dateStr) {
       const roomBookings = realTimeBookings.filter(b => b.roomId === roomId && b.date === dateStr);
       if (!roomBookings || roomBookings.length === 0) return 'ว่าง';
@@ -873,12 +887,10 @@
       const now = new Date();
       const todayISO = formatDateISO(now);
 
-      // ถ้าไม่ใช่วันนี้ คืนค่า 'ว่าง'
       if (dateStr !== todayISO) return 'ว่าง';
 
       const currentMins = now.getHours() * 60 + now.getMinutes();
 
-      // วนลูปเช็คช่วงเวลาจองปัจจุบัน
       for (let b of roomBookings) {
         const startM = timeToMins(b.startTime);
         const endM = timeToMins(b.endTime);
@@ -902,7 +914,6 @@
 
       const todayStr = formatDateISO(new Date());
 
-      // ถ้าเป็นวันพรุ่งนี้ ซ่อน Real-time Overview ทั้งกล่องทันที
       if (selectedDateStr !== todayStr) {
         container.classList.add('hidden');
         return;
@@ -946,7 +957,6 @@
         let st = '';
         let badgeHtml = '';
 
-        // แสดงสถานะเฉพาะเมื่อดูของ "วันนี้" เท่านั้น
         if (isToday) {
           st = libInfo.isClosed ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
           let badgeColor = "bg-gray-400";
@@ -960,7 +970,6 @@
             <span class="font-bold text-sm">${room.name} <span class="text-xs text-gray-500 font-normal">(${st})</span></span>
           `;
         } else {
-          // ถ้าเลือก "พรุ่งนี้" จะแสดงเฉพาะชื่อห้อง ปล่อยโล่ง ไม่โชว์คำว่าว่างหรือไม่อย่างแน่นอน
           badgeHtml = `<span class="font-bold text-sm">${room.name}</span>`;
         }
 
