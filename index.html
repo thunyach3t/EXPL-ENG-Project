@@ -880,6 +880,7 @@
       return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
     }
 
+    // แก้ไขระบบเช็คสถานะห้อง Real-time ให้ตรวจ "นาทีปัจจุบัน" เท่านั้น (ถ้าไม่อยู่ในช่วงเวลาจอง จะคืนค่า 'ว่าง' ทันที)
     function getRoomCurrentRealtimeStatus(roomId, dateStr) {
       const roomBookings = realTimeBookings.filter(b => b.roomId === roomId && b.date === dateStr);
       if (!roomBookings || roomBookings.length === 0) return 'ว่าง';
@@ -895,6 +896,7 @@
         const startM = timeToMins(b.startTime);
         const endM = timeToMins(b.endTime);
 
+        // เช็คว่าเวลาปัจจุบันอยู่ในช่วงจองนี้จริงๆ หรือไม่
         if (currentMins >= startM && currentMins < endM) {
           if (b.isShareable) return 'แชร์ร่วมกันได้';
           return 'ไม่ว่าง';
@@ -1047,7 +1049,6 @@
       }
     }
 
-    // ฟังก์ชันเลือกเวลามีการดักจับ currentUser เพื่อป้องกันโค้ดค้างเรียบร้อย
     function selectTimeSlotForBooking(startTime) {
       if (!currentUser) { 
         openLoginModal(); 
@@ -1101,16 +1102,27 @@
       selectEnd.innerHTML = '';
       const startMins = timeToMins(startTime);
       const isWeekend = (targetDate.getDay() === 0 || targetDate.getDay() === 6);
+      const closingMins = isWeekend ? 17 * 60 : 19 * 60;
       
       const stdId = currentUser ? currentUser.studentId : null;
       const usedMins = getUserTotalBookedMinutesOnDate(stdId, selectedDateStr);
-      const maxEndMins = Math.min(startMins + Math.min(120, 120 - usedMins), isWeekend ? 17 * 60 : 19 * 60);
+      const remainingQuota = Math.max(15, 120 - usedMins);
+      
+      const maxEndMins = Math.min(startMins + remainingQuota, closingMins);
 
       for (let m = startMins + 15; m <= maxEndMins; m += 15) {
         const hh = String(Math.floor(m / 60)).padStart(2, '0');
         const mm = String(m % 60).padStart(2, '0');
         selectEnd.innerHTML += `<option value="${hh}:${mm}">${hh}:${mm} น.</option>`;
       }
+
+      if (selectEnd.options.length === 0 && startMins < closingMins) {
+        const endM = Math.min(startMins + 15, closingMins);
+        const hh = String(Math.floor(endM / 60)).padStart(2, '0');
+        const mm = String(endM % 60).padStart(2, '0');
+        selectEnd.innerHTML = `<option value="${hh}:${mm}">${hh}:${mm} น.</option>`;
+      }
+
       showPage('pageBookingForm');
     }
 
