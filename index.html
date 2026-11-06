@@ -360,8 +360,7 @@
       { id: 'sem_a', name: 'Seminar Room A', category: 'Seminar Room' },
       { id: 'sem_b', name: 'Seminar Room B', category: 'Seminar Room' },
       { id: 'sem_c', name: 'Seminar Room C', category: 'Seminar Room' },
-      ...Array.from({ length: 7 }, (_, i) => ({ id: `study_${i+1}`, name: `Study Room ${i+1}`, category: 'Study Room' })),
-      ...['A', 'B', 'C', 'D', 'E', 'F'].map(l => ({ id: `box_${l}`, name: `The Box ${l}`, category: 'The Box' }))
+      ...Array.from({ length: 7 }, (_, i) => ({ id: `study_${i+1}`, name: `Study Room ${i+1}`, category: 'Study Room' }))
     ];
 
     let currentUser = null;
@@ -470,6 +469,13 @@
       document.getElementById('themeIconMob').className = iconClass;
     }
 
+    // ตัวตรวจสอบวันหยุดเพื่อดูว่าเป็นเสาร์-อาทิตย์หรือไม่จากรูปแบบ YYYY-MM-DD
+    function isWeekendString(dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      const day = d.getDay();
+      return (day === 0 || day === 6);
+    }
+
     function setupFirestoreListeners() {
       db.collection("bookings").onSnapshot(snapshot => {
         realTimeBookings = [];
@@ -479,7 +485,11 @@
           const endM = timeToMins(data.endTime);
           const duration = endM - startM;
 
-          if (duration > 240 || (data.startTime === "00:00" && data.endTime === "23:59")) {
+          // เช็ควันเปิด-ปิดเพื่อล้างข้อมูลขยะนอกเวลาทำการ หรือขยะบล็อก 2 ชั่วโมง (08:00-10:00, 10:00-12:00)
+          const weekend = isWeekendString(data.date);
+          const minOpeningMins = weekend ? 9 * 60 : 8 * 60;
+
+          if (duration > 240 || (data.startTime === "00:00" && data.endTime === "23:59") || startM < minOpeningMins) {
             db.collection("bookings").doc(doc.id).delete();
             return;
           }
@@ -568,8 +578,7 @@
       const todayStr = formatDateISO(now);
       const isToday = selectedDateStr === todayStr;
 
-      const dateObj = new Date(selectedDateStr + 'T00:00:00');
-      const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+      const isWeekend = isWeekendString(selectedDateStr);
       const openingHour = isWeekend ? 9 : 8; 
       const closingHour = isWeekend ? 17 : 19;
 
@@ -880,7 +889,6 @@
       return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
     }
 
-    // แก้ไขระบบเช็คสถานะห้อง Real-time ให้ตรวจ "นาทีปัจจุบัน" เท่านั้น (ถ้าไม่อยู่ในช่วงเวลาจอง จะคืนค่า 'ว่าง' ทันที)
     function getRoomCurrentRealtimeStatus(roomId, dateStr) {
       const roomBookings = realTimeBookings.filter(b => b.roomId === roomId && b.date === dateStr);
       if (!roomBookings || roomBookings.length === 0) return 'ว่าง';
@@ -896,7 +904,6 @@
         const startM = timeToMins(b.startTime);
         const endM = timeToMins(b.endTime);
 
-        // เช็คว่าเวลาปัจจุบันอยู่ในช่วงจองนี้จริงๆ หรือไม่
         if (currentMins >= startM && currentMins < endM) {
           if (b.isShareable) return 'แชร์ร่วมกันได้';
           return 'ไม่ว่าง';
@@ -946,7 +953,6 @@
     function renderAccordionRooms() {
       renderCategory('seminarRooms', ALL_ROOMS.filter(r => r.category === 'Seminar Room'));
       renderCategory('studyRooms', ALL_ROOMS.filter(r => r.category === 'Study Room'));
-      renderCategory('boxRooms', ALL_ROOMS.filter(r => r.category === 'The Box'));
     }
 
     function renderCategory(containerId, rooms) {
@@ -1068,27 +1074,14 @@
       const starStd3 = document.getElementById('star_std3');
       const starStd4 = document.getElementById('star_std4');
 
-      if (selectedRoom.category === 'The Box') {
-        wrapStd2.classList.add('hidden');
-        wrapStd3.classList.add('hidden');
-        wrapStd4.classList.add('hidden');
-        wrapStd5.classList.add('hidden');
-        wrapStd6.classList.add('hidden');
-        document.getElementById('studentId2').value = '';
-        document.getElementById('studentId3').value = '';
-        document.getElementById('studentId4').value = '';
-        document.getElementById('studentId5').value = '';
-        document.getElementById('studentId6').value = '';
-      } else {
-        wrapStd2.classList.remove('hidden');
-        wrapStd3.classList.remove('hidden');
-        wrapStd4.classList.remove('hidden');
-        wrapStd5.classList.remove('hidden');
-        wrapStd6.classList.remove('hidden');
-        starStd2.classList.remove('hidden');
-        starStd3.classList.remove('hidden');
-        starStd4.classList.remove('hidden');
-      }
+      wrapStd2.classList.remove('hidden');
+      wrapStd3.classList.remove('hidden');
+      wrapStd4.classList.remove('hidden');
+      wrapStd5.classList.remove('hidden');
+      wrapStd6.classList.remove('hidden');
+      starStd2.classList.remove('hidden');
+      starStd3.classList.remove('hidden');
+      starStd4.classList.remove('hidden');
 
       selectedStartTime = startTime;
       
@@ -1101,7 +1094,7 @@
       const selectEnd = document.getElementById('endTimeSelect');
       selectEnd.innerHTML = '';
       const startMins = timeToMins(startTime);
-      const isWeekend = (targetDate.getDay() === 0 || targetDate.getDay() === 6);
+      const isWeekend = isWeekendString(selectedDateStr);
       const closingMins = isWeekend ? 17 * 60 : 19 * 60;
       
       const stdId = currentUser ? currentUser.studentId : null;
@@ -1152,25 +1145,20 @@
       const std5 = document.getElementById('studentId5').value.trim();
       const std6 = document.getElementById('studentId6').value.trim();
       
-      let allStudents = [];
-      if (selectedRoom.category === 'The Box') {
-        allStudents = [std1];
-      } else {
-        const rawInputs = [std1, std2, std3, std4, std5, std6].filter(id => id.length > 0);
-        
-        for (let stdId of rawInputs) {
-          if (!isValidStudentIdFormat(stdId)) {
-            alert(`❌ รหัสนิสิต (${stdId}) ไม่ถูกต้อง ต้องมี 10 หลัก ขึ้นต้นด้วย 4 ปีล่าสุด (66-69) และลงท้ายด้วย 21`);
-            return;
-          }
-        }
-
-        if (rawInputs.length < 4) {
-          alert('❌ สำหรับห้อง Seminar และ Study Room จำเป็นต้องกรอกรหัสนิสิตอย่างน้อย 4 คนครับ');
+      const rawInputs = [std1, std2, std3, std4, std5, std6].filter(id => id.length > 0);
+      
+      for (let stdId of rawInputs) {
+        if (!isValidStudentIdFormat(stdId)) {
+          alert(`❌ รหัสนิสิต (${stdId}) ไม่ถูกต้อง ต้องมี 10 หลัก ขึ้นต้นด้วย 4 ปีล่าสุด (66-69) และลงท้ายด้วย 21`);
           return;
         }
-        allStudents = rawInputs;
       }
+
+      if (rawInputs.length < 4) {
+        alert('❌ สำหรับห้อง Seminar และ Study Room จำเป็นต้องกรอกรหัสนิสิตอย่างน้อย 4 คนครับ');
+        return;
+      }
+      let allStudents = rawInputs;
 
       const studentDetails = allStudents.map(id => ({
         studentId: id,
