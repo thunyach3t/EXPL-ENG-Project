@@ -1634,6 +1634,9 @@
           <li class="nav-item"><button class="nav-link px-3 py-1" data-bs-toggle="tab" data-bs-target="#dashboard"
               onclick="setDatePickerValue('statDatePicker', getLocalDateStr(new Date())); loadStats(); closeTopbarMenuOnMobile();"
               style="font-size:0.92rem; padding: 6px 16px;">📈 สถิติ & ประวัติ</button></li>
+          <li class="nav-item"><button class="nav-link px-3 py-1" data-bs-toggle="tab" data-bs-target="#webQueue"
+              onclick="openWebQueueTab(); closeTopbarMenuOnMobile();"
+              style="font-size:0.92rem; padding: 6px 16px;">🌐 คิวเว็บ & ห้องแชร์</button></li>
         </ul>
         <div class="d-flex align-items-center gap-2 ms-2">
           <select id="staffProfile" style="display:none;" class="form-select form-select-sm"></select>
@@ -2043,6 +2046,22 @@
           </div>
 
           <!-- Tab: สถิติ -->
+          <!-- Tab: คิวจองผ่านเว็บ & ห้องแชร์ (อ่าน/จัดการข้อมูลจาก Firebase ของหน้าจอง index.html) -->
+          <div class="tab-pane fade" id="webQueue">
+            <div class="card p-4 border-0 shadow-sm" style="background:var(--bg-card);color:var(--text-main);">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <h5 class="fw-bold m-0">🌐 คิวจองผ่านเว็บ &amp; ห้องแชร์ (Shareable)</h5>
+                <div class="d-flex align-items-center gap-2">
+                  <input type="date" id="wqDate" class="form-control form-control-sm" style="width:auto;" onchange="loadWebQueue()">
+                  <span id="wqStatus" class="small" style="color:var(--text-muted);"></span>
+                </div>
+              </div>
+              <div class="small mb-3" style="color:var(--text-muted);">ข้อมูลชุดนี้มาจากฐานข้อมูล Firebase ของหน้าจองออนไลน์ (แยกจากตาราง Google Sheets) อัปเดตแบบเรียลไทม์</div>
+              <div id="wqSummary" class="d-flex flex-wrap gap-2 mb-3"></div>
+              <div id="wqList" class="row g-3"></div>
+            </div>
+          </div>
+
           <div class="tab-pane fade" id="dashboard">
             <div class="card p-4 bg-light border-0 shadow-sm">
               <div class="d-flex justify-content-between align-items-center mb-4" style="flex-wrap:wrap; gap:10px;">
@@ -2527,6 +2546,8 @@
   </div>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     let gData = null, currentTabName = null, isAnyModalOpen = false;
@@ -4688,6 +4709,128 @@
         }
       } catch (e) { }
     };
+
+    // =========================================
+    // 🌐 คิวจองผ่านเว็บ & ห้องแชร์ (Firebase เดียวกับ index.html)
+    // =========================================
+    const WQ_FIREBASE_CONFIG = {
+      apiKey: "AIzaSyAAIQqx48PCSJbo3kKbZ1QPOg4hO_VFxR8",
+      authDomain: "expl-eng.firebaseapp.com",
+      projectId: "expl-eng",
+      storageBucket: "expl-eng.firebasestorage.app",
+      messagingSenderId: "317681931288",
+      appId: "1:317681931288:web:2b7d48c63dd9285e799f6d"
+    };
+    let _wqDb = null, _wqUnsub = null, _wqData = [], _wqPendingRender = false;
+
+    function wqEsc(v) {
+      return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function wqT2M(t) { const p = (t || '0:0').split(':'); return parseInt(p[0], 10) * 60 + parseInt(p[1], 10); }
+    function wqM2T(m) { return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+
+    function openWebQueueTab() {
+      const el = document.getElementById('wqDate');
+      if (!el.value) el.value = getLocalDateStr(new Date());
+      loadWebQueue();
+    }
+
+    function loadWebQueue() {
+      const status = document.getElementById('wqStatus');
+      if (typeof firebase === 'undefined') { status.innerText = '❌ โหลด Firebase ไม่สำเร็จ'; return; }
+      if (!_wqDb) {
+        const app = firebase.initializeApp(WQ_FIREBASE_CONFIG, 'webq');
+        _wqDb = app.firestore();
+        try { _wqDb.settings({ experimentalForceLongPolling: true, merge: true }); } catch (e) { }
+      }
+      if (_wqUnsub) { _wqUnsub(); _wqUnsub = null; }
+      const date = document.getElementById('wqDate').value || getLocalDateStr(new Date());
+      status.innerText = 'กำลังโหลด...';
+      _wqUnsub = _wqDb.collection('bookings').where('date', '==', date).onSnapshot(snap => {
+        _wqData = [];
+        snap.forEach(d => _wqData.push({ id: d.id, ...d.data() }));
+        status.innerText = 'เรียลไทม์ ✓';
+        renderWebQueue();
+      }, err => { status.innerText = '❌ อ่านข้อมูลไม่ได้ (ตรวจ Firestore rules)'; console.error(err); });
+    }
+
+    function wqNextFree(list, dateStr) {
+      const d = new Date(dateStr + 'T00:00:00'), wk = d.getDay() === 0 || d.getDay() === 6;
+      const open = (wk ? 9 : 8) * 60, close = (wk ? 17 : 19) * 60;
+      const now = new Date();
+      let from = open;
+      if (dateStr === getLocalDateStr(now)) from = Math.max(open, Math.floor((now.getHours() * 60 + now.getMinutes()) / 15) * 15 + 15);
+      if (from >= close) return 'หมดเวลาจองแล้ว';
+      for (let m = from; m < close; m += 15) {
+        if (!list.some(b => m >= wqT2M(b.startTime) && m < wqT2M(b.endTime))) return 'จองได้เร็วสุด ' + wqM2T(m) + ' น.';
+      }
+      return 'เต็มทั้งวัน';
+    }
+
+    function renderWebQueue() {
+      const wrap = document.getElementById('wqList');
+      // กันพิมพ์หัวข้ออยู่แล้วโดนรีเฟรชทับ
+      if (wrap.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') { _wqPendingRender = true; return; }
+      _wqPendingRender = false;
+      const date = document.getElementById('wqDate').value;
+      const shareN = _wqData.filter(b => b.isShareable).length;
+      document.getElementById('wqSummary').innerHTML =
+        `<span class="badge bg-secondary">ทั้งหมด ${_wqData.length} คิว</span>` +
+        `<span class="badge" style="background:#ec4899;">🤝 ห้องแชร์ ${shareN}</span>` +
+        `<span class="badge bg-danger">🔒 ส่วนตัว ${_wqData.length - shareN}</span>`;
+
+      if (!_wqData.length) { wrap.innerHTML = '<div class="col-12 text-center py-4" style="color:var(--text-muted);">ไม่มีคิวจองผ่านเว็บในวันนี้</div>'; return; }
+
+      const byRoom = {};
+      _wqData.forEach(b => { (byRoom[b.roomName || b.roomId] = byRoom[b.roomName || b.roomId] || []).push(b); });
+      wrap.innerHTML = Object.keys(byRoom).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map(room => {
+        const list = byRoom[room].sort((a, b) => wqT2M(a.startTime) - wqT2M(b.startTime));
+        const rows = list.map((b, i) => {
+          const n = b.studentIds ? b.studentIds.length : 1;
+          return `<div class="p-2 mb-2 rounded" style="border:1px solid var(--border-color);background:${b.isShareable ? 'rgba(236,72,153,.08)' : 'var(--bg-light)'};">
+            <div class="d-flex justify-content-between align-items-center">
+              <b>คิว ${i + 1} · ${wqEsc(b.startTime)} - ${wqEsc(b.endTime)} น.</b>
+              <span class="small fw-bold" style="color:${b.isShareable ? '#db2777' : '#dc2626'};">${b.isShareable ? '🤝 แชร์ ' + n + '/6' : '🔒 ส่วนตัว'}</span>
+            </div>
+            <div class="small" style="color:var(--text-muted);">ผู้จอง: ${wqEsc(b.bookerName)} · รหัส: ${wqEsc((b.studentIds || []).join(', ') || '-')}</div>
+            <div class="d-flex gap-1 mt-2">
+              <input id="wqTitle_${b.id}" class="form-control form-control-sm" maxlength="40" placeholder="หัวข้อ/ชื่อห้อง" value="${wqEsc(b.roomTitle || '')}">
+              <button class="btn btn-sm btn-primary text-nowrap" onclick="wqSaveTitle('${b.id}')">บันทึก</button>
+            </div>
+            <div class="d-flex gap-1 mt-2">
+              <button class="btn btn-sm btn-outline-secondary" onclick="wqToggleShare('${b.id}')">${b.isShareable ? 'เปลี่ยนเป็นส่วนตัว' : 'เปลี่ยนเป็นแชร์ได้'}</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="wqDelete('${b.id}')">ลบคิว</button>
+            </div>
+          </div>`;
+        }).join('');
+        return `<div class="col-12 col-md-6 col-xl-4"><div class="card h-100 p-3" style="background:var(--bg-input);border:1px solid var(--border-color);">
+          <div class="fw-bold">${wqEsc(room)}</div>
+          <div class="small mb-2" style="color:#2e7d63;">⏱ ${wqNextFree(list, date)}</div>${rows}</div></div>`;
+      }).join('');
+    }
+
+    document.addEventListener('focusout', () => { if (_wqPendingRender) setTimeout(renderWebQueue, 150); });
+
+    function wqSaveTitle(id) {
+      const v = document.getElementById('wqTitle_' + id).value.trim().slice(0, 40);
+      _wqDb.collection('bookings').doc(id).update({ roomTitle: v })
+        .then(() => showAlert('บันทึกหัวข้อแล้ว', 'success')).catch(handleServerError);
+    }
+    function wqToggleShare(id) {
+      const b = _wqData.find(x => x.id === id); if (!b) return;
+      const toShare = !b.isShareable;
+      const upd = { isShareable: toShare, status: toShare ? 'shareable' : 'occupied' };
+      if (!toShare) upd.roomTitle = '';
+      _wqDb.collection('bookings').doc(id).update(upd)
+        .then(() => showAlert('อัปเดตประเภทห้องแล้ว', 'success')).catch(handleServerError);
+    }
+    function wqDelete(id) {
+      const b = _wqData.find(x => x.id === id); if (!b) return;
+      showConfirm('ลบคิวจองผ่านเว็บ', `${b.roomName} ${b.startTime}-${b.endTime} (${b.bookerName})`, 'danger', () => {
+        _wqDb.collection('bookings').doc(id).delete()
+          .then(() => showAlert('ลบคิวแล้ว', 'success')).catch(handleServerError);
+      });
+    }
   </script>
   </div>
 
