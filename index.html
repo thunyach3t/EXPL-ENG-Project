@@ -294,20 +294,27 @@
           <h4 class="font-bold border-b pb-2 mb-3 text-sm">รูปแบบการใช้งานห้อง</h4>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label class="p-3 border rounded-xl flex items-start space-x-3 cursor-pointer hover:border-chula-main transition">
-              <input type="radio" name="roomUsageType" value="private" checked class="mt-1 text-chula-main focus:ring-chula-main">
+              <input type="radio" name="roomUsageType" value="private" checked onchange="toggleRoomTitleField()" class="mt-1 text-chula-main focus:ring-chula-main">
               <div>
                 <span class="font-bold text-sm block">🔒 ห้องส่วนตัว (เฉพาะกลุ่มเพื่อน)</span>
                 <span class="text-xs text-gray-500 block">สถานะจะขึ้นสีแดง (ไม่ว่าง)</span>
               </div>
             </label>
             <label class="p-3 border rounded-xl flex items-start space-x-3 cursor-pointer hover:border-pink-500 transition">
-              <input type="radio" name="roomUsageType" value="shareable" class="mt-1 text-pink-500 focus:ring-pink-500">
+              <input type="radio" name="roomUsageType" value="shareable" onchange="toggleRoomTitleField()" class="mt-1 text-pink-500 focus:ring-pink-500">
               <div>
                 <span class="font-bold text-sm block text-pink-600 dark:text-pink-400">🤝 แชร์ร่วมกันได้ (Shareable)</span>
                 <span class="text-xs text-gray-500 block">สถานะจะขึ้นสีชมพู</span>
               </div>
             </label>
           </div>
+        </div>
+
+        <div id="roomTitleWrap" class="hidden">
+          <h4 class="font-bold border-b pb-2 mb-3 text-sm">🏷️ หัวข้อ / ชื่อห้องแชร์</h4>
+          <input type="text" id="roomTitle" maxlength="40" placeholder="เช่น ห้องติว Calculus (ไม่บังคับ)"
+            class="w-full p-2.5 border border-pink-300 rounded-lg bg-white dark:bg-gray-800 dark:border-pink-800 dark:text-white outline-none text-sm">
+          <p class="text-[11px] text-gray-500 mt-1">คนอื่นจะเห็นหัวข้อนี้ที่กล่องห้องและในคิวของห้อง เพื่อเลือกเข้าร่วมได้ตรงกับที่ต้องการ</p>
         </div>
 
         <div>
@@ -760,6 +767,7 @@
         endTime: req.reqEndTime,
         status: 'occupied',
         isShareable: false,
+        roomTitle: '',
         studentIds: [reqStudentId],
         studentDetails: [{ studentId: reqStudentId, email: reqEmail, startTime: req.reqStartTime, endTime: req.reqEndTime }]
       });
@@ -789,7 +797,7 @@
             realTimeBookings.map(b => `
               <div class="p-3 border rounded-lg text-xs flex justify-between items-center bg-gray-50 dark:bg-gray-800">
                 <div>
-                  <div class="font-bold text-chula-main">${b.roomName} (${b.isShareable ? '🌸 แชร์ได้' : '🔒 ส่วนตัว'})</div>
+                  <div class="font-bold text-chula-main">${b.roomName} (${b.isShareable ? '🌸 แชร์ได้' : '🔒 ส่วนตัว'})${b.roomTitle ? ' · 🏷️ ' + escapeHtml(b.roomTitle) : ''}</div>
                   <div>📅 <b>วันที่:</b> ${b.date}</div>
                   <div>🕒 <b>เวลาจอง:</b> ${b.startTime} - ${b.endTime} น.</div>
                   <div class="text-[11px] text-gray-500">ผู้จอง: ${b.bookerName} (รหัส: ${b.studentIds ? b.studentIds.join(', ') : '-'})</div>
@@ -884,6 +892,7 @@
       renderRealtimeOverviewGrid();
       renderAccordionRooms();
       if (selectedRoom) renderTimeSlots();
+      refreshOpenRoomQueue();
     }
 
     function timeToMins(timeStr) {
@@ -916,6 +925,118 @@
       return 'ว่าง';
     }
 
+    function escapeHtml(v) {
+      return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function minsToTime(m) {
+      return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+    }
+
+    function toggleRoomTitleField() {
+      const checked = document.querySelector('input[name="roomUsageType"]:checked');
+      document.getElementById('roomTitleWrap').classList.toggle('hidden', !(checked && checked.value === 'shareable'));
+    }
+
+    function getRoomBookingsSorted(roomId, dateStr) {
+      return realTimeBookings
+        .filter(b => b.roomId === roomId && b.date === dateStr)
+        .sort((a, b) => timeToMins(a.startTime) - timeToMins(b.startTime));
+    }
+
+    function getCurrentRoomBooking(roomId, dateStr) {
+      if (dateStr !== formatDateISO(new Date())) return null;
+      const now = new Date();
+      const cur = now.getHours() * 60 + now.getMinutes();
+      return getRoomBookingsSorted(roomId, dateStr).find(b => cur >= timeToMins(b.startTime) && cur < timeToMins(b.endTime)) || null;
+    }
+
+    // ช่องเวลาแรกสุดที่ห้องนี้ยังจองได้ (ช่องละ 15 นาที)
+    function getRoomNextFree(roomId, dateStr) {
+      const wk = isWeekendString(dateStr);
+      const open = (wk ? 9 : 8) * 60, close = (wk ? 17 : 19) * 60;
+      const now = new Date();
+      let from = open;
+      if (dateStr === formatDateISO(now)) {
+        const cur = now.getHours() * 60 + now.getMinutes();
+        from = Math.max(open, Math.floor(cur / 15) * 15 + 15);
+      }
+      if (from >= close) return { state: 'closed' };
+      const list = getRoomBookingsSorted(roomId, dateStr);
+      for (let m = from; m < close; m += 15) {
+        if (!list.some(b => m >= timeToMins(b.startTime) && m < timeToMins(b.endTime))) return { state: 'ok', time: minsToTime(m) };
+      }
+      return { state: 'full' };
+    }
+
+    function nextFreeLabel(info) {
+      if (info.state === 'closed') return 'หมดเวลาจองวันนี้';
+      if (info.state === 'full') return 'เต็มทั้งวัน';
+      return `จองได้เร็วสุด ${info.time} น.`;
+    }
+
+    function renderRoomQueueHtml(roomId) {
+      const room = ALL_ROOMS.find(r => r.id === roomId);
+      const list = getRoomBookingsSorted(roomId, selectedDateStr);
+      const isToday = selectedDateStr === formatDateISO(new Date());
+      const now = new Date();
+      const cur = now.getHours() * 60 + now.getMinutes();
+      const nf = getRoomNextFree(roomId, selectedDateStr);
+
+      const rows = list.map((b, i) => {
+        const s = timeToMins(b.startTime), e = timeToMins(b.endTime);
+        const done = isToday && cur >= e;
+        const live = isToday && cur >= s && cur < e;
+        const members = b.studentIds ? b.studentIds.length : 1;
+        const stateTag = done ? '<span class="px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 dark:bg-gray-700">เสร็จแล้ว</span>'
+          : live ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">● กำลังใช้งาน</span>'
+          : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">รอคิว</span>';
+        const typeTag = b.isShareable
+          ? `<span class="text-pink-600 font-bold">🤝 แชร์ได้ ${members}/6 คน</span>`
+          : '<span class="text-red-600 font-bold">🔒 ส่วนตัว</span>';
+        const canJoin = b.isShareable && !done && members < 6;
+        return `
+          <div class="p-3 border rounded-lg text-xs ${done ? 'opacity-50' : ''} ${b.isShareable ? 'border-pink-300 bg-pink-50/60 dark:bg-pink-950/30' : 'bg-gray-50 dark:bg-gray-800'}">
+            <div class="flex justify-between items-center gap-2">
+              <div class="font-bold text-sm">คิว ${i + 1} · ${b.startTime} - ${b.endTime} น.</div>
+              ${stateTag}
+            </div>
+            ${b.roomTitle ? `<div class="mt-1 font-semibold text-pink-700 dark:text-pink-300">🏷️ ${escapeHtml(b.roomTitle)}</div>` : ''}
+            <div class="mt-1 flex justify-between items-center gap-2">
+              <span class="text-gray-500">ผู้จอง: ${escapeHtml(b.bookerName)}</span>
+              ${typeTag}
+            </div>
+            ${canJoin ? `<button onclick="promptShareRoom('${b.startTime}', '${b.startTime}', '${b.endTime}', '${b.id}')" class="mt-2 px-2.5 py-1 bg-pink-600 text-white rounded font-bold hover:bg-pink-700">ขอเข้าร่วมห้องนี้</button>` : ''}
+          </div>`;
+      }).join('');
+
+      return `
+        <div id="roomQueueWrap" data-room="${roomId}">
+          <h3 class="font-bold text-chula-main dark:text-red-400 text-base mb-1"><i class="fa-solid fa-list-ol mr-1"></i> คิวของ ${room.name}</h3>
+          <p class="text-xs text-gray-500 mb-1">วันที่ ${selectedDateStr}</p>
+          <p class="text-xs font-semibold mb-3 text-emerald-700 dark:text-emerald-300">⏱ ${nextFreeLabel(nf)}</p>
+          <div class="space-y-2 max-h-72 overflow-y-auto">
+            ${list.length ? rows : '<p class="text-xs text-gray-500 text-center py-4">ยังไม่มีคิวจอง ห้องนี้ว่างทั้งวัน 🎉</p>'}
+          </div>
+          <div class="mt-4 pt-3 border-t flex justify-end space-x-2">
+            <button onclick="closeModal()" class="px-3 py-2 bg-gray-200 text-gray-700 rounded text-xs">ปิด</button>
+            <button onclick="closeModal(); openRoomTimeSlots('${room.id}', '${room.name}')" class="px-3 py-2 bg-chula-main text-white rounded text-xs font-bold">เลือกเวลาจองห้องนี้</button>
+          </div>
+        </div>`;
+    }
+
+    function openRoomQueue(roomId) {
+      document.getElementById('modalContent').innerHTML = renderRoomQueueHtml(roomId);
+      document.getElementById('modalOverlay').classList.remove('hidden');
+    }
+
+    function refreshOpenRoomQueue() {
+      const w = document.getElementById('roomQueueWrap');
+      if (w && !document.getElementById('modalOverlay').classList.contains('hidden')) {
+        document.getElementById('modalContent').innerHTML = renderRoomQueueHtml(w.dataset.room);
+      }
+    }
+
     function renderRealtimeOverviewGrid() {
       const container = document.getElementById('realtimeOverviewContainer');
       const grid = document.getElementById('realtimeOverviewGrid');
@@ -943,11 +1064,15 @@
         else if (status === 'แชร์ร่วมกันได้') colorClasses = "bg-pink-50 border-pink-500 text-pink-700 dark:bg-pink-950/60 dark:text-pink-300";
         else colorClasses = "bg-red-50 border-red-500 text-red-700 dark:bg-red-950/60 dark:text-red-300";
 
+        const curB = libInfo.isClosed ? null : getCurrentRoomBooking(room.id, selectedDateStr);
+        const nfText = libInfo.isClosed ? '' : nextFreeLabel(getRoomNextFree(room.id, selectedDateStr));
         return `
-          <div onclick="openRoomTimeSlots('${room.id}', '${room.name}')" 
-            class="p-3 border-2 rounded-xl text-center cursor-pointer hover:scale-105 transition transform flex flex-col justify-center items-center h-20 ${colorClasses}">
+          <div onclick="openRoomQueue('${room.id}')" 
+            class="p-3 border-2 rounded-xl text-center cursor-pointer hover:scale-105 transition transform flex flex-col justify-center items-center min-h-[6rem] ${colorClasses}">
             <div class="font-bold text-xs sm:text-sm truncate w-full">${room.name}</div>
-            <div class="text-[11px] font-semibold mt-1">${status}</div>
+            <div class="text-[11px] font-semibold mt-0.5">${status}</div>
+            ${curB && curB.roomTitle ? `<div class="text-[10px] truncate w-full">🏷️ ${escapeHtml(curB.roomTitle)}</div>` : ''}
+            ${nfText ? `<div class="text-[10px] opacity-80 mt-0.5">⏱ ${nfText}</div>` : ''}
           </div>
         `;
       }).join('');
@@ -968,6 +1093,8 @@
       container.innerHTML = rooms.map(room => {
         let st = '';
         let badgeHtml = '';
+        const nfText = nextFreeLabel(getRoomNextFree(room.id, selectedDateStr));
+        const titles = getRoomBookingsSorted(room.id, selectedDateStr).filter(b => b.roomTitle).slice(0, 2).map(b => '🏷️ ' + escapeHtml(b.roomTitle)).join(' · ');
 
         if (isToday) {
           st = libInfo.isClosed ? 'ห้องปิด' : getRoomCurrentRealtimeStatus(room.id, selectedDateStr);
@@ -986,11 +1113,12 @@
         }
 
         return `
-          <div class="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
-            <div class="flex items-center space-x-3">
-              ${badgeHtml}
+          <div onclick="openRoomQueue('${room.id}')" class="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition cursor-pointer">
+            <div>
+              <div class="flex items-center space-x-3">${badgeHtml}</div>
+              <div class="text-[11px] text-gray-500 mt-0.5">⏱ ${nfText}${titles ? ' · ' + titles : ''}</div>
             </div>
-            <button onclick="openRoomTimeSlots('${room.id}', '${room.name}')" class="text-chula-main dark:text-red-400 font-bold text-xs flex items-center space-x-1">
+            <button onclick="event.stopPropagation(); openRoomTimeSlots('${room.id}', '${room.name}')" class="text-chula-main dark:text-red-400 font-bold text-xs flex items-center space-x-1">
               <span>จองออนไลน์</span><i class="fa-solid fa-chevron-right text-[10px]"></i>
             </button>
           </div>
@@ -1040,7 +1168,7 @@
             const memberCount = booked.studentIds ? booked.studentIds.length : 1;
             btnStyle = "bg-pink-100 text-pink-700 border-pink-400 hover:bg-pink-200 dark:bg-pink-950/60 dark:text-pink-300 font-bold";
             action = `onclick="promptShareRoom('${time}', '${booked.startTime}', '${booked.endTime}', '${booked.id}')"`;
-            label = `<span class="text-[10px] block text-pink-600">แชร์ได้ (จองร่วม ${memberCount}/6 คน)</span>`;
+            label = `<span class="text-[10px] block text-pink-600">แชร์ได้ (จองร่วม ${memberCount}/6 คน)</span>${booked.roomTitle ? `<span class="text-[10px] block truncate w-full text-pink-700">🏷️ ${escapeHtml(booked.roomTitle)}</span>` : ''}`;
           } else {
             btnStyle = "bg-gray-300 text-gray-600 border-gray-400 hover:bg-red-100 hover:text-red-700 dark:bg-gray-700 dark:text-gray-400";
             action = `onclick="promptQueue('${time}', '${booked.startTime}', '${booked.endTime}')"`;
@@ -1133,6 +1261,8 @@
         selectEnd.innerHTML = `<option value="${hh}:${mm}">${hh}:${mm} น.</option>`;
       }
 
+      document.getElementById('roomTitle').value = '';
+      toggleRoomTitleField();
       showPage('pageBookingForm');
     }
 
@@ -1200,6 +1330,7 @@
         bookerName: document.getElementById('bookerName').value.trim(),
         bookerEmail: currentUser.email,
         isShareable: isShareable,
+        roomTitle: isShareable ? document.getElementById('roomTitle').value.trim().slice(0, 40) : '',
         status: isShareable ? 'shareable' : 'occupied',
         studentIds: allStudents,
         studentDetails: studentDetails,
@@ -1248,6 +1379,7 @@
 
       document.getElementById('modalContent').innerHTML = `
         <h3 class="text-base font-bold text-pink-600 mb-2"><i class="fa-solid fa-users mr-1"></i> ยืนยันการจองร่วม (ห้องแชร์)</h3>
+        ${bookingObj.roomTitle ? `<p class="text-sm font-semibold text-pink-700 mb-1">🏷️ ${escapeHtml(bookingObj.roomTitle)}</p>` : ''}
         <p class="text-xs mb-3">ช่วงเวลารวมของห้อง: <b>${rangeStart} - ${rangeEnd} น.</b></p>
         <div class="grid grid-cols-2 gap-2 mb-3">
           <div>
@@ -1404,7 +1536,7 @@
               return `
                 <div class="p-2.5 border rounded text-xs flex justify-between items-center bg-gray-50 dark:bg-gray-800">
                   <div>
-                    <div class="font-bold">${b.roomName} (${b.isShareable ? '🌸 แชร์ได้' : '🔒 ส่วนตัว'})</div>
+                    <div class="font-bold">${b.roomName} (${b.isShareable ? '🌸 แชร์ได้' : '🔒 ส่วนตัว'})${b.roomTitle ? ' · 🏷️ ' + escapeHtml(b.roomTitle) : ''}</div>
                     <div>📅 <b>วันที่:</b> ${b.date} | 🕒 <b>เวลาจอง:</b> ${displayStart} - ${displayEnd} น.</div>
                     <div class="text-[11px] text-gray-500">ผู้จอง: ${b.bookerName} (รหัส: ${b.studentIds ? b.studentIds.join(', ') : '-'})</div>
                   </div>
