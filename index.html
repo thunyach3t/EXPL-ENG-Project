@@ -8,6 +8,7 @@
   <!-- Tailwind CSS & Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
+    window.tailwind = window.tailwind || {};
     tailwind.config = {
       darkMode: 'class',
       theme: {
@@ -25,10 +26,17 @@
       }
     }
   </script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style> 
-    body { font-family: 'Kanit', sans-serif; } 
+    body { font-family: 'Kanit', sans-serif; }
+    .fa-solid{font-style:normal;display:inline-block;line-height:1;font-weight:700}
+    .fa-xmark::before{content:"✕"}.fa-bell::before{content:"🔔"}.fa-moon::before{content:"🌙"}.fa-sun::before{content:"☀️"}
+    .fa-book-bookmark::before{content:"📖"}.fa-right-to-bracket::before{content:"➜"}.fa-bullhorn::before{content:"📢"}
+    .fa-user-graduate::before{content:"🎓"}.fa-shield-halved::before{content:"🛡️"}.fa-lock::before{content:"🔒"}
+    .fa-magnifying-glass::before{content:"🔍"}.fa-chart-simple::before{content:"📊"}.fa-arrow-left::before{content:"←"}
+    .fa-chevron-down::before{content:"▾"}.fa-chevron-right::before{content:"›"}.fa-thumbtack::before{content:"📌"}
+    .fa-users::before{content:"👥"}.fa-list-ol::before{content:"☰"}.fa-table-cells::before{content:"▦"}
+    @media (max-width:640px){input,select,textarea{font-size:16px !important}} 
     .dark input:-webkit-autofill,
     .dark input:-webkit-autofill:hover, 
     .dark input:-webkit-autofill:focus {
@@ -51,8 +59,47 @@
       messagingSenderId: "317681931288",
       appId: "1:317681931288:web:2b7d48c63dd9285e799f6d"
     };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    // ---- ตัวช่วยที่ทำงานได้ทุกสภาพแวดล้อม (ไม่พังถ้าเบราว์เซอร์บล็อกสิ่งเหล่านี้) ----
+    const _mem = {};
+    function safeGet(k) { try { return safeGet(k); } catch (e) { return _mem[k] || null; } }
+    function safeSet(k, v) { try { safeSet(k, v); } catch (e) { _mem[k] = v; } }
+    function safeDel(k) { try { safeDel(k); } catch (e) { delete _mem[k]; } }
+    function showToast(msg) {
+      let c = document.getElementById('toastBox');
+      if (!c) { c = document.createElement('div'); c.id = 'toastBox'; c.className = 'fixed top-3 left-1/2 -translate-x-1/2 z-[100] space-y-2 w-[92%] max-w-sm pointer-events-none'; document.body.appendChild(c); }
+      const t = document.createElement('div');
+      t.className = 'bg-gray-900 text-white text-sm rounded-xl px-4 py-3 shadow-2xl whitespace-pre-line';
+      t.textContent = String(msg); c.appendChild(t); setTimeout(() => t.remove(), 5000);
+    }
+    window.alert = showToast;
+    function askConfirm(msg) {
+      return new Promise(res => {
+        const o = document.createElement('div');
+        o.className = 'fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4';
+        o.innerHTML = '<div class="bg-white dark:bg-chula-darkCard rounded-xl p-5 max-w-sm w-full text-sm"><p class="mb-4 whitespace-pre-line"></p><div class="flex justify-end gap-2"><button data-v="0" class="px-3 py-2 border rounded">ยกเลิก</button><button data-v="1" class="px-3 py-2 bg-chula-main text-white rounded font-bold">ยืนยัน</button></div></div>';
+        o.querySelector('p').textContent = msg;
+        o.onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (v !== undefined) { o.remove(); res(v === '1'); } };
+        document.body.appendChild(o);
+      });
+    }
+    // ฐานข้อมูลจำลองในหน่วยความจำ (ใช้เมื่อเชื่อม Firebase ไม่ได้ เช่น ในหน้าตัวอย่าง)
+    function memDb() {
+      const C = {}, S = {}; let n = 0;
+      const snap = k => { const docs = Object.entries(C[k]).map(([id, d]) => ({ id, data: () => d })); return { forEach: f => docs.forEach(f) }; };
+      const emit = k => (S[k] || []).forEach(f => f(snap(k)));
+      return { collection: k => { C[k] = C[k] || {}; return {
+        onSnapshot: f => { (S[k] = S[k] || []).push(f); setTimeout(() => f(snap(k))); },
+        add: async d => { const id = 'm' + (++n); C[k][id] = d; emit(k); return { id }; },
+        doc: id => ({ update: async o => { if (C[k][id]) Object.assign(C[k][id], o); emit(k); }, delete: async () => { delete C[k][id]; emit(k); } })
+      }; } };
+    }
+    var db = null, DEMO_MODE = false;
+    try { firebase.initializeApp(firebaseConfig); db = firebase.firestore(); } catch (e) { }
+    if (!db) {
+      DEMO_MODE = true;
+      window.firebase = { firestore: { FieldValue: { serverTimestamp: () => ({ seconds: Math.floor(Date.now() / 1000) }) } } };
+      db = memDb();
+    }
   </script>
 </head>
 <body class="bg-gray-100 dark:bg-chula-darkBg text-gray-800 dark:text-gray-100 min-h-screen transition-colors duration-200">
@@ -136,6 +183,7 @@
       <i class="fa-solid fa-bullhorn text-yellow-300 shrink-0"></i>
       <span class="truncate">ต่อเวลาห้อง ย้ายห้อง ติดต่อเจ้าหน้าที่เคาน์เตอร์หรือทักข้อความในไลน์ได้เลยครับ</span>
     </div>
+  <div id="demoBanner" class="hidden bg-yellow-300 text-yellow-900 text-xs text-center py-1.5 px-3 font-semibold">🧪 โหมดทดลอง: เชื่อมต่อ Firebase ไม่ได้ในหน้านี้ ข้อมูลที่จองจะไม่ถูกบันทึกถาวร (เมื่ออัปขึ้นเว็บจริงจะเชื่อมต่อได้ตามปกติ)</div>
   </header>
 
   <!-- Login Modal -->
@@ -146,7 +194,7 @@
         <i class="fa-solid fa-lock mr-2"></i>เข้าสู่ระบบนิสิตจุฬาฯ
       </h2>
       <p class="text-xs text-gray-500 dark:text-gray-400 text-center mb-6">
-        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต 4 ปีล่าสุด ลงท้าย 21)
+        โปรดใช้อีเมลนิสิตคณะวิศวกรรมศาสตร์ (ลงท้ายด้วย @student.chula.ac.th และรหัสนิสิต ย้อนหลัง 8 ปี ลงท้าย 21)
       </p>
       <form onsubmit="handleLogin(event)" class="space-y-4">
         <div>
@@ -198,6 +246,16 @@
         </button>
       </div>
       <div id="libraryStatusBanner" class="text-xs text-center font-semibold py-1.5 px-3 rounded-md"></div>
+    </div>
+
+    <!-- Quick booking grid -->
+    <div class="bg-white dark:bg-chula-darkCard p-4 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800">
+      <div class="font-bold text-sm mb-0.5">⚡ จองด่วน · ตารางเรียลไทม์</div>
+      <p class="text-[11px] text-gray-500 mb-2">แตะช่อง<b class="text-emerald-600">สีเขียว</b>เพื่อจอง · แตะช่องสีอื่นเพื่อดูคิวของห้อง</p>
+      <div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] mb-2">
+        <span><i class="inline-block w-3 h-3 rounded bg-emerald-400 align-middle"></i> ว่าง</span><span><i class="inline-block w-3 h-3 rounded bg-amber-400 align-middle"></i> รอยืนยัน</span><span><i class="inline-block w-3 h-3 rounded bg-red-500 align-middle"></i> ไม่ว่าง</span><span><i class="inline-block w-3 h-3 rounded bg-pink-400 align-middle"></i> แชร์ได้</span><span><i class="inline-block w-3 h-3 rounded bg-gray-300 align-middle"></i> เลยเวลา</span>
+      </div>
+      <div id="liveGridScroll" class="overflow-x-auto"><table id="liveGrid" class="w-max border-separate text-xs" style="border-spacing:2px"></table></div>
     </div>
 
     <!-- Real-time Overview Room Status Grid -->
@@ -326,7 +384,8 @@
         </div>
 
         <div>
-          <h4 class="font-bold border-b pb-2 mb-3 text-sm">กรอกรหัสนิสิต</h4>
+          <h4 class="font-bold border-b pb-2 mb-3 text-sm">กรอกรหัสนิสิต (สูงสุด 12 คน)</h4>
+          <p class="text-[11px] text-gray-500 mb-2">ห้องส่วนตัวต้องกรอกอย่างน้อย 4 คน · ห้องแชร์จองคนเดียวได้ แต่ต้องมีสมาชิกครบ 4 คนภายใน 15 นาทีแรกของเวลาจอง</p>
           <div id="studentInputsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div><label class="block text-xs text-gray-500 mb-1">คนแรก (ผู้จอง - Auto Fill) <span class="text-red-500">*</span></label><input type="text" id="studentId1" readonly class="w-full p-2.5 bg-gray-100 dark:bg-gray-800 dark:border-gray-700 text-gray-500 dark:text-gray-400 border rounded-lg font-semibold text-sm cursor-not-allowed"></div>
             <div id="wrap_std2"><label class="block text-xs text-gray-500 mb-1">คนที่ 2 <span id="star_std2" class="text-red-500 hidden">*</span></label><input type="text" id="studentId2" maxlength="10" placeholder="66-69xxxx21" class="w-full p-2.5 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"></div>
@@ -353,7 +412,7 @@
 
     <!-- Modal Overlay -->
     <div id="modalOverlay" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div class="bg-white dark:bg-chula-darkCard rounded-xl max-w-lg w-full p-6 shadow-2xl relative">
+      <div class="bg-white dark:bg-chula-darkCard rounded-xl max-w-lg w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
         <button onclick="closeModal()" class="absolute right-4 top-4 text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark text-xl"></i></button>
         <div id="modalContent"></div>
       </div>
@@ -361,7 +420,7 @@
   </main>
 
   <script>
-    const VALID_YEARS = ['66', '67', '68', '69'];
+    const MAX_MEMBERS = 12, MIN_MEMBERS = 4, CONFIRM_MINS = 15;
 
     const ALL_ROOMS = [
       { id: 'sem_a', name: 'Seminar Room A', category: 'Seminar Room' },
@@ -379,6 +438,7 @@
     let realTimeRequests = [];
 
     document.addEventListener("DOMContentLoaded", () => {
+      if (DEMO_MODE) document.getElementById('demoBanner').classList.remove('hidden');
       checkStoredUserSession();
       initDates();
       setupFirestoreListeners();
@@ -390,7 +450,7 @@
     });
 
     function checkStoredUserSession() {
-      const savedUser = localStorage.getItem('chula_user_session');
+      const savedUser = safeGet('chula_user_session');
       if (savedUser) {
         currentUser = JSON.parse(savedUser);
         updateAuthCornerUI(true);
@@ -426,10 +486,9 @@
     function closeLoginModal() { document.getElementById('loginModal').classList.add('hidden'); }
 
     function isValidStudentIdFormat(stdId) {
-      if (!stdId || stdId.length !== 10) return false;
-      if (!stdId.endsWith('21')) return false;
-      const yearPrefix = stdId.substring(0, 2);
-      return VALID_YEARS.includes(yearPrefix);
+      if (!/^\d{10}$/.test(stdId || '') || !stdId.endsWith('21')) return false;
+      const cur = (new Date().getFullYear() + 543) % 100, y = parseInt(stdId.substring(0, 2), 10);
+      return y >= cur - 8 && y <= cur;
     }
 
     function handleLogin(e) {
@@ -437,29 +496,21 @@
       const inputVal = document.getElementById('loginEmail').value.trim().toLowerCase();
       const errEl = document.getElementById('loginError');
 
-      if (inputVal === 'student_admin.chula.ac.th') {
-        currentUser = { email: inputVal, isAdmin: true };
-        localStorage.setItem('chula_user_session', JSON.stringify(currentUser));
-        updateAuthCornerUI(true);
-        closeLoginModal();
-        return;
-      }
-
-      if (!inputVal.endsWith('@student.chula.ac.th')) {
-        errEl.innerText = "❌ กรุณาใช้อีเมลโดเมน @student.chula.ac.th หรือ student_admin.chula.ac.th";
+            if (!inputVal.endsWith('@student.chula.ac.th')) {
+        errEl.innerText = "❌ กรุณาใช้อีเมลโดเมน @student.chula.ac.th";
         errEl.classList.remove('hidden');
         return;
       }
 
       const stdId = inputVal.split('@')[0];
       if (!isValidStudentIdFormat(stdId)) {
-        errEl.innerText = "❌ สงวนสิทธิ์เฉพาะนิสิตวิศวะ 4 ปีล่าสุด (รหัส 10 หลัก ขึ้นต้นด้วย 66-69 และลงท้ายด้วย 21)";
+        errEl.innerText = "❌ สงวนสิทธิ์เฉพาะนิสิตวิศวะ ย้อนหลัง 8 ปี (รหัส 10 หลัก ขึ้นต้นด้วยรหัสปีย้อนหลัง 8 ปี และลงท้ายด้วย 21)";
         errEl.classList.remove('hidden');
         return;
       }
 
       currentUser = { email: inputVal, studentId: stdId, isAdmin: false };
-      localStorage.setItem('chula_user_session', JSON.stringify(currentUser));
+      safeSet('chula_user_session', JSON.stringify(currentUser));
       updateAuthCornerUI(true);
       closeLoginModal();
 
@@ -470,7 +521,7 @@
 
     function logout() {
       currentUser = null;
-      localStorage.removeItem('chula_user_session');
+      safeDel('chula_user_session');
       updateAuthCornerUI(false);
     }
 
@@ -492,6 +543,7 @@
         realTimeBookings = [];
         snapshot.forEach(doc => {
           const data = doc.data();
+          if (data.status === 'cancelled') return;
           const startM = timeToMins(data.startTime);
           const endM = timeToMins(data.endTime);
           const duration = endM - startM;
@@ -508,6 +560,7 @@
         });
 
         cleanExpiredData();
+        cleanupExpiredBookings();
         renderAllOverviewGrids();
         updateNotificationBellHub();
       });
@@ -712,8 +765,8 @@
       let studentDetails = parentBooking.studentDetails || [];
       const reqStudentId = req.requesterEmail.split('@')[0];
 
-      if (studentIds.length >= 6) {
-        alert('❌ สมาชิกในห้องเต็ม Limit (6 คน) แล้ว');
+      if (studentIds.length >= MAX_MEMBERS) {
+        alert('❌ สมาชิกในห้องเต็ม Limit (12 คน) แล้ว');
         return;
       }
 
@@ -817,7 +870,7 @@
     }
 
     async function adminDeleteBooking(id) {
-      if (!confirm('ยืนยันลบคิวการจองนี้ในฐานะ Admin?')) return;
+      if (!(await askConfirm('ยืนยันลบคิวการจองนี้ในฐานะ Admin?'))) return;
       await db.collection("bookings").doc(id).delete();
       alert('🗑️ ลบคิวเรียบร้อย');
       closeModal();
@@ -865,7 +918,7 @@
       const stdId = document.getElementById('adminStdId').value.trim();
 
       if (!isValidStudentIdFormat(stdId)) {
-        alert('❌ รหัสนิสิตไม่ถูกต้อง ต้องมี 10 หลัก ขึ้นต้นด้วย 4 ปีล่าสุด (66-69) และลงท้ายด้วย 21 เท่านั้น');
+        alert('❌ รหัสนิสิตไม่ถูกต้อง ต้องมี 10 หลัก ขึ้นต้นด้วย ย้อนหลัง 8 ปี (ปีย้อนหลัง 8 ปี) และลงท้ายด้วย 21 เท่านั้น');
         return;
       }
 
@@ -891,6 +944,7 @@
     function renderAllOverviewGrids() {
       renderRealtimeOverviewGrid();
       renderAccordionRooms();
+      renderLiveGrid();
       if (selectedRoom) renderTimeSlots();
       refreshOpenRoomQueue();
     }
@@ -917,6 +971,7 @@
         const endM = timeToMins(b.endTime);
 
         if (currentMins >= startM && currentMins < endM) {
+          if (b.status === 'pending') return 'รอการยืนยัน';
           if (b.isShareable) return 'แชร์ร่วมกันได้';
           return 'ไม่ว่าง';
         }
@@ -992,7 +1047,7 @@
           : live ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">● กำลังใช้งาน</span>'
           : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">รอคิว</span>';
         const typeTag = b.isShareable
-          ? `<span class="text-pink-600 font-bold">🤝 แชร์ได้ ${members}/6 คน</span>`
+          ? `<span class="text-pink-600 font-bold">🤝 แชร์ได้ ${members}/12 คน</span>`
           : '<span class="text-red-600 font-bold">🔒 ส่วนตัว</span>';
         const canJoin = b.isShareable && !done && members < 6;
         return `
@@ -1127,6 +1182,7 @@
     }
 
     function openRoomTimeSlots(roomId, roomName) {
+      window._quick = null;
       selectedRoom = ALL_ROOMS.find(r => r.id === roomId);
       document.getElementById('selectedRoomTitle').innerText = roomName;
       showPage('pageTimeSlots');
@@ -1168,11 +1224,11 @@
             const memberCount = booked.studentIds ? booked.studentIds.length : 1;
             btnStyle = "bg-pink-100 text-pink-700 border-pink-400 hover:bg-pink-200 dark:bg-pink-950/60 dark:text-pink-300 font-bold";
             action = `onclick="promptShareRoom('${time}', '${booked.startTime}', '${booked.endTime}', '${booked.id}')"`;
-            label = `<span class="text-[10px] block text-pink-600">แชร์ได้ (จองร่วม ${memberCount}/6 คน)</span>${booked.roomTitle ? `<span class="text-[10px] block truncate w-full text-pink-700">🏷️ ${escapeHtml(booked.roomTitle)}</span>` : ''}`;
+            label = `<span class="text-[10px] block text-pink-600">แชร์ได้ (จองร่วม ${memberCount}/12 คน)</span>${booked.roomTitle ? `<span class="text-[10px] block truncate w-full text-pink-700">🏷️ ${escapeHtml(booked.roomTitle)}</span>` : ''}`;
           } else {
-            btnStyle = "bg-gray-300 text-gray-600 border-gray-400 hover:bg-red-100 hover:text-red-700 dark:bg-gray-700 dark:text-gray-400";
+            btnStyle = booked.status === 'pending' ? "bg-amber-100 text-amber-800 border-amber-400 hover:bg-amber-200" : "bg-gray-300 text-gray-600 border-gray-400 hover:bg-red-100 hover:text-red-700 dark:bg-gray-700 dark:text-gray-400";
             action = `onclick="promptQueue('${time}', '${booked.startTime}', '${booked.endTime}')"`;
-            label = `<span class="text-[10px] block text-red-500 font-semibold">จองแล้ว (ขอคิว)</span>`;
+            label = `<span class="text-[10px] block ${booked.status === 'pending' ? 'text-amber-700' : 'text-red-500'} font-semibold">${booked.status === 'pending' ? 'รอยืนยัน' : 'จองแล้ว'} (ขอคิว)</span>`;
           }
         } else {
           btnStyle = "bg-white text-gray-800 border-gray-300 hover:border-chula-main hover:text-chula-main dark:bg-gray-800 dark:text-white dark:border-gray-700 font-bold shadow-sm cursor-pointer";
@@ -1230,6 +1286,11 @@
         starStd4.classList.remove('hidden');
       }
 
+      for (let i = 2; i <= 12; i++) { const f = document.getElementById('studentId' + i); if (f) f.value = ''; }
+      for (let i = 7; i <= 12; i++) {
+        const w = document.getElementById('wrap_std' + i);
+        if (selectedRoom.category === 'The Box') { w.classList.add('hidden'); document.getElementById('studentId' + i).value = ''; } else w.classList.remove('hidden');
+      }
       const dateParts = selectedDateStr.split('-');
       const targetDate = new Date(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10));
       document.getElementById('formDateDisplay').value = formatDateTh(targetDate);
@@ -1246,7 +1307,8 @@
       const usedMins = getUserTotalBookedMinutesOnDate(stdId, selectedDateStr);
       const remainingQuota = Math.max(15, 120 - usedMins);
       
-      const maxEndMins = Math.min(startMins + remainingQuota, closingMins);
+      const nextBusy = realTimeBookings.filter(b => b.roomId === selectedRoom.id && b.date === selectedDateStr && timeToMins(b.startTime) > startMins).map(b => timeToMins(b.startTime));
+      const maxEndMins = Math.min(startMins + remainingQuota, closingMins, ...nextBusy);
 
       for (let m = startMins + 15; m <= maxEndMins; m += 15) {
         const hh = String(Math.floor(m / 60)).padStart(2, '0');
@@ -1263,6 +1325,11 @@
 
       document.getElementById('roomTitle').value = '';
       toggleRoomTitleField();
+      if (window._quick && window._quick.time === startTime) {
+        const o = [...selectEnd.options].find(x => x.value === window._quick.end);
+        if (o) selectEnd.value = o.value;
+        window._quick = null;
+      }
       showPage('pageBookingForm');
     }
 
@@ -1298,16 +1365,17 @@
       if (selectedRoom.category === 'The Box') {
         allStudents = [std1];
       } else {
-        const rawInputs = [std1, std2, std3, std4, std5, std6].filter(id => id.length > 0);
+        const rawInputs = [std1, ...Array.from({ length: 11 }, (_, k) => document.getElementById('studentId' + (k + 2)).value.trim())].filter(id => id.length > 0);
         
         for (let stdId of rawInputs) {
           if (!isValidStudentIdFormat(stdId)) {
-            alert(`❌ รหัสนิสิต (${stdId}) ไม่ถูกต้อง ต้องมี 10 หลัก ขึ้นต้นด้วย 4 ปีล่าสุด (66-69) และลงท้ายด้วย 21`);
+            alert(`❌ รหัสนิสิต (${stdId}) ไม่ถูกต้อง ต้องมี 10 หลัก ขึ้นต้นด้วย ย้อนหลัง 8 ปี (ปีย้อนหลัง 8 ปี) และลงท้ายด้วย 21`);
             return;
           }
         }
 
-        if (rawInputs.length < 4) {
+        if (new Set(rawInputs).size !== rawInputs.length) { alert('❌ ตรวจพบรหัสนิสิตซ้ำกันในกลุ่ม'); return; }
+        if (!isShareable && rawInputs.length < MIN_MEMBERS) {
           alert('❌ สำหรับห้อง Seminar และ Study Room จำเป็นต้องกรอกรหัสนิสิตอย่างน้อย 4 คนครับ');
           return;
         }
@@ -1331,14 +1399,21 @@
         bookerEmail: currentUser.email,
         isShareable: isShareable,
         roomTitle: isShareable ? document.getElementById('roomTitle').value.trim().slice(0, 40) : '',
-        status: isShareable ? 'shareable' : 'occupied',
+        status: 'pending',
+        confirmDeadline: Math.max(Date.now(), new Date(`${selectedDateStr}T${selectedStartTime}:00`).getTime()) + CONFIRM_MINS * 60000,
         studentIds: allStudents,
         studentDetails: studentDetails,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       };
 
-      await db.collection("bookings").add(newBooking);
-      alert('✅ บันทึกการจองสำเร็จแล้ว!');
+      if (realTimeBookings.some(b => b.roomId === selectedRoom.id && b.date === selectedDateStr && isTimeOverlap(selectedStartTime, endTime, b.startTime, b.endTime))) {
+        alert('❌ ช่วงเวลานี้เพิ่งมีคนจองตัดหน้าไป กรุณาเลือกเวลาใหม่');
+        showPage('pageTimeSlots'); renderTimeSlots(); return;
+      }
+      const subBtn = document.getElementById('btnSubmitBooking'); subBtn.disabled = true;
+      try { await db.collection("bookings").add(newBooking); } finally { subBtn.disabled = false; }
+      selectedStartTime = null;
+      alert('✅ จองสำเร็จ สถานะ "รอการยืนยัน" (สีเหลือง)\nกรุณามายืนยันตัวตนกับเจ้าหน้าที่ภายใน 15 นาทีหลังเวลาเริ่ม มิฉะนั้นระบบจะยกเลิกอัตโนมัติ' + (isShareable ? '\nห้องแชร์ต้องมีสมาชิกครบ 4 คนภายใน 15 นาทีแรก' : ''));
       showPage('pageRoomList');
     }
 
@@ -1358,8 +1433,8 @@
         return;
       }
 
-      if (bookingObj.studentIds && bookingObj.studentIds.length >= 6) {
-        alert('❌ ห้องนี้มีผู้ใช้งานเต็ม Limit (6 คน) แล้ว');
+      if (bookingObj.studentIds && bookingObj.studentIds.length >= MAX_MEMBERS) {
+        alert('❌ ห้องนี้มีผู้ใช้งานเต็ม Limit (12 คน) แล้ว');
         return;
       }
 
@@ -1551,7 +1626,7 @@
     }
 
     async function cancelBooking(id) {
-      if (!confirm('ยืนยันยกเลิก?')) return;
+      if (!(await askConfirm('ยืนยันยกเลิกการจองนี้?'))) return;
       await db.collection("bookings").doc(id).delete();
       alert('ยกเลิกเรียบร้อย');
       closeModal();
@@ -1601,6 +1676,84 @@
       const m = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
       return `${d.getDate()} ${m[d.getMonth()]} ${d.getFullYear() + 543}`;
     }
+
+    (function () {
+      const c = document.getElementById('studentInputsContainer');
+      for (let i = 7; i <= 12; i++) c.insertAdjacentHTML('beforeend', `<div id="wrap_std${i}"><label class="block text-xs text-gray-500 mb-1">คนที่ ${i}</label><input type="text" id="studentId${i}" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"></div>`);
+    })();
+
+    function getBookingAt(roomId, mins) {
+      return realTimeBookings.find(x => x.roomId === roomId && x.date === selectedDateStr && mins >= timeToMins(x.startTime) && mins < timeToMins(x.endTime));
+    }
+
+    function quickBook(roomId, time) {
+      const room = ALL_ROOMS.find(r => r.id === roomId);
+      const s = timeToMins(time), close = (isWeekendString(selectedDateStr) ? 17 : 19) * 60;
+      const used = currentUser && !currentUser.isAdmin ? getUserTotalBookedMinutesOnDate(currentUser.studentId, selectedDateStr) : 0;
+      const opts = [30, 60, 90, 120].filter(d => {
+        if (s + d > close || used + d > 120) return false;
+        for (let m = s; m < s + d; m += 15) if (getBookingAt(roomId, m)) return false;
+        return true;
+      });
+      if (!opts.length) opts.push(15);
+      const label = d => d < 60 ? d + ' นาที' : (d / 60) + ' ชม.';
+      document.getElementById('modalContent').innerHTML = `
+        <h3 class="font-bold text-chula-main dark:text-red-400 text-base mb-1">⚡ จองด่วน</h3>
+        <p class="text-sm font-semibold">${room.name}</p>
+        <p class="text-xs text-gray-500 mb-3">${selectedDateStr} · เริ่ม ${time} น. · เลือกระยะเวลา</p>
+        <div class="grid grid-cols-2 gap-2">
+          ${opts.map(d => `<button onclick="goQuickBook('${roomId}','${time}',${d})" class="py-3 rounded-xl border-2 border-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 font-bold text-sm"><div>${label(d)}</div><div class="text-[11px] font-normal text-gray-500">ถึง ${minsToTime(s + d)} น.</div></button>`).join('')}
+        </div>`;
+      document.getElementById('modalOverlay').classList.remove('hidden');
+    }
+
+    function goQuickBook(roomId, time, d) {
+      closeModal();
+      selectedRoom = ALL_ROOMS.find(r => r.id === roomId);
+      document.getElementById('selectedRoomTitle').innerText = selectedRoom.name;
+      window._quick = { time, end: minsToTime(timeToMins(time) + d) };
+      selectTimeSlotForBooking(time);
+    }
+
+    function renderLiveGrid() {
+      const open = (isWeekendString(selectedDateStr) ? 9 : 8) * 60, close = (isWeekendString(selectedDateStr) ? 17 : 19) * 60;
+      const now = new Date(), isToday = selectedDateStr === formatDateISO(now), cur = now.getHours() * 60 + now.getMinutes();
+      const cols = []; for (let m = open; m < close; m += 30) cols.push(m);
+      const sticky = 'sticky left-0 z-10 bg-white dark:bg-chula-darkCard';
+      let h = `<tr><th class="${sticky}"></th>` + cols.map(m => `<th class="font-normal text-[10px] text-left min-w-[46px] ${isToday && cur >= m && cur < m + 30 ? 'text-chula-main font-bold' : 'text-gray-500'}">${m % 60 === 0 ? minsToTime(m) : ''}</th>`).join('') + '</tr>';
+      let lastCat = '';
+      ALL_ROOMS.forEach(r => {
+        if (r.category !== lastCat) { lastCat = r.category; h += `<tr><td class="${sticky} pt-2 text-[11px] font-bold text-chula-main dark:text-red-400 whitespace-nowrap">${r.category}</td></tr>`; }
+        h += `<tr><td class="${sticky} pr-2 whitespace-nowrap font-semibold text-[11px]">${r.name.replace('Seminar Room ', 'Sem ').replace('Study Room ', 'Study ').replace('The Box ', 'Box ')}</td>`;
+        cols.forEach(m => {
+          const free = [m, m + 15].find(x => !(isToday && x <= cur) && !getBookingAt(r.id, x));
+          const b = getBookingAt(r.id, m) || getBookingAt(r.id, m + 15);
+          let cls = 'bg-gray-200 dark:bg-gray-700', act = '', tip = '';
+          if (free !== undefined) { cls = 'bg-emerald-400 hover:bg-emerald-500 cursor-pointer'; act = `quickBook('${r.id}','${minsToTime(free)}')`; tip = 'จองเริ่ม ' + minsToTime(free); }
+          else if (b) { cls = (b.status === 'pending' ? 'bg-amber-400' : b.isShareable ? 'bg-pink-400' : 'bg-red-500') + ' cursor-pointer'; act = `openRoomQueue('${r.id}')`; tip = (b.roomTitle ? b.roomTitle + ' · ' : '') + b.startTime + '-' + b.endTime; }
+          h += `<td ${act ? `onclick="${act}"` : ''} title="${escapeHtml(tip)}" class="h-9 min-w-[46px] rounded-md ${cls}"></td>`;
+        });
+        h += '</tr>';
+      });
+      document.getElementById('liveGrid').innerHTML = h;
+      if (isToday && !window._gridScrolled) { document.getElementById('liveGridScroll').scrollLeft = Math.max(0, (cur - open) / 30 * 48 - 80); window._gridScrolled = true; }
+    }
+
+    // ยกเลิกอัตโนมัติ: ไม่ได้รับการยืนยันภายใน 15 นาที หรือห้องแชร์สมาชิกไม่ครบ 4 คน
+    async function cleanupExpiredBookings() {
+      const now = Date.now();
+      for (const b of realTimeBookings) {
+        const deadline = b.confirmDeadline || (new Date(`${b.date}T${b.startTime}:00`).getTime() + CONFIRM_MINS * 60000);
+        if (now < deadline) continue;
+        const room = ALL_ROOMS.find(r => r.id === b.roomId);
+        const underfilled = b.isShareable && room && room.category !== 'The Box' && (b.studentIds ? b.studentIds.length : 1) < MIN_MEMBERS;
+        if (b.status !== 'pending' && !underfilled) continue;
+        try {
+          await db.collection('bookings').doc(b.id).update({ status: 'cancelled', cancelReason: b.status === 'pending' ? 'ไม่ได้รับการยืนยันภายใน 15 นาที' : 'สมาชิกห้องแชร์ไม่ครบ 4 คน' });
+        } catch (e) { }
+      }
+    }
+    setInterval(() => { cleanupExpiredBookings(); renderLiveGrid(); }, 30000);
   </script>
 </body>
 </html>
