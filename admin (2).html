@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="th"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin - ENG Library Chula</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<style>body{font-family:'Kanit',sans-serif}@media (max-width:640px){input,select,textarea{font-size:16px!important}}</style></head>
+<body class="bg-gray-100 text-gray-800 min-h-screen">
+<div id="loginBox" class="min-h-screen flex items-center justify-center p-4">
+  <form onsubmit="login(event)" class="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm space-y-3">
+    <h1 class="text-lg font-bold text-[#7A0016] text-center">🔐 เข้าสู่ระบบเจ้าหน้าที่</h1>
+    <input id="user" required placeholder="Username" class="w-full p-2.5 border rounded-lg text-sm">
+    <input id="pass" type="password" required placeholder="Password" class="w-full p-2.5 border rounded-lg text-sm">
+    <p id="err" class="text-xs text-red-500"></p>
+    <button class="w-full py-2.5 bg-[#7A0016] text-white font-bold rounded-lg text-sm">เข้าสู่ระบบ</button>
+  </form>
+</div>
+<div id="appBox" class="hidden max-w-7xl mx-auto p-3 space-y-3">
+  <div class="bg-[#7A0016] text-white p-3 rounded-xl flex flex-wrap items-center justify-between gap-2">
+    <b>📚 ระบบจัดการห้อง · ห้องสมุดวิศวะ จุฬาฯ</b>
+    <div class="flex items-center gap-2 text-sm">
+      <input type="date" id="dateSel" onchange="setDate(this.value)" class="text-gray-800 rounded p-1">
+      <button onclick="setDate(fmt(new Date()))" class="px-2 py-1 bg-white/20 rounded">วันนี้</button>
+      <button onclick="auth.signOut()" class="px-2 py-1 bg-white text-[#7A0016] rounded font-bold">ออก</button>
+    </div>
+  </div>
+  <div class="bg-white rounded-xl p-3 shadow">
+    <div class="font-bold text-sm mb-2">⏳ รอการยืนยัน (Pending) <span id="pCount" class="text-xs bg-amber-100 text-amber-800 rounded-full px-2"></span></div>
+    <div id="pending" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
+  </div>
+  <div class="bg-white rounded-xl p-3 shadow">
+    <div class="flex flex-wrap justify-between gap-2 mb-2 text-[11px]"><b class="text-sm">ตารางจอง (เรียลไทม์)</b>
+      <span><i class="inline-block w-3 h-3 rounded bg-emerald-400"></i> ว่าง <i class="inline-block w-3 h-3 rounded bg-amber-400"></i> รอยืนยัน <i class="inline-block w-3 h-3 rounded bg-red-500"></i> ไม่ว่าง <i class="inline-block w-3 h-3 rounded bg-pink-400"></i> แชร์ได้ · กดช่องที่มีคิวเพื่อจัดการ</span></div>
+    <div class="overflow-x-auto"><table id="grid" class="border-separate border-spacing-0 text-xs"></table></div>
+  </div>
+  <div id="detail" class="hidden bg-white rounded-xl p-3 shadow text-sm space-y-2"></div>
+  <form onsubmit="walkIn(event)" class="bg-white rounded-xl p-3 shadow text-sm grid sm:grid-cols-6 gap-2 items-end">
+    <b class="sm:col-span-6">➕ ลงคิว Walk-in (อนุมัติทันที · วันที่ตามที่เลือกด้านบน)</b>
+    <select id="wRoom" class="border rounded p-2 sm:col-span-2"></select>
+    <input id="wStart" type="time" step="900" value="10:00" required class="border rounded p-2">
+    <input id="wEnd" type="time" step="900" value="11:00" required class="border rounded p-2">
+    <input id="wId" maxlength="10" required placeholder="รหัสนิสิต 10 หลัก" class="border rounded p-2">
+    <button class="bg-emerald-600 text-white font-bold rounded p-2">บันทึก</button>
+  </form>
+</div>
+<script>
+const _m=window.firebase;
+function showToast(m){let c=document.getElementById('toastBox');if(!c){c=document.createElement('div');c.id='toastBox';c.className='fixed top-3 left-1/2 -translate-x-1/2 z-[100] space-y-2 w-[92%] max-w-sm pointer-events-none';document.body.appendChild(c)}const t=document.createElement('div');t.className='bg-gray-900 text-white text-sm rounded-xl px-4 py-3 shadow-2xl whitespace-pre-line';t.textContent=String(m);c.appendChild(t);setTimeout(()=>t.remove(),5000)}
+window.alert=showToast;
+function askConfirm(msg){return new Promise(res=>{const o=document.createElement('div');o.className='fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4';o.innerHTML='<div class="bg-white rounded-xl p-5 max-w-sm w-full text-sm"><p class="mb-4"></p><div class="flex justify-end gap-2"><button data-v="0" class="px-3 py-2 border rounded">ยกเลิก</button><button data-v="1" class="px-3 py-2 bg-[#7A0016] text-white rounded font-bold">ยืนยัน</button></div></div>';o.querySelector('p').textContent=msg;o.onclick=e=>{const v=e.target.dataset&&e.target.dataset.v;if(v!==undefined){o.remove();res(v==='1')}};document.body.appendChild(o)})}
+if(!_m)document.addEventListener('DOMContentLoaded',()=>document.getElementById('err').textContent='⚠️ โหลด Firebase ไม่สำเร็จ ต้องเปิดไฟล์นี้จากเว็บจริง (เช่น GitHub Pages) และต้องมีอินเทอร์เน็ต');
+_m&&firebase.initializeApp({apiKey:"AIzaSyAAIQqx48PCSJbo3kKbZ1QPOg4hO_VFxR8",authDomain:"expl-eng.firebaseapp.com",projectId:"expl-eng",storageBucket:"expl-eng.firebasestorage.app",messagingSenderId:"317681931288",appId:"1:317681931288:web:2b7d48c63dd9285e799f6d"});
+const db=_m?firebase.firestore():null, auth=_m?firebase.auth():null, DOM='@eng-library.local', CONFIRM=15, MINM=4;
+const ROOMS=[...['A','B','C'].map(l=>({id:'sem_'+l.toLowerCase(),name:'Seminar Room '+l,cat:'S'})),...Array.from({length:7},(_,i)=>({id:'study_'+(i+1),name:'Study Room '+(i+1),cat:'S'})),...'ABCDEF'.split('').map(l=>({id:'box_'+l,name:'The Box '+l,cat:'B'}))];
+let all=[], date=fmt(new Date()), sel=null, started=false;
+function fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+const T2M=t=>{const p=t.split(':');return +p[0]*60+ +p[1]}, M2T=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=id=>document.getElementById(id);
+function login(e){e.preventDefault();if(!auth)return;$('err').textContent='';auth.signInWithEmailAndPassword($('user').value.trim().toLowerCase()+DOM,$('pass').value).catch(()=>$('err').textContent='Username หรือ Password ไม่ถูกต้อง')}
+auth&&auth.onAuthStateChanged(u=>{$('loginBox').classList.toggle('hidden',!!u);$('appBox').classList.toggle('hidden',!u);if(u&&!started){started=true;start()}});
+function start(){
+  $('dateSel').value=date; $('wRoom').innerHTML=ROOMS.map(r=>`<option value="${r.id}">${r.name}</option>`).join('');
+  db.collection('bookings').onSnapshot(s=>{all=s.docs.map(d=>({id:d.id,...d.data()})).filter(b=>b.status!=='cancelled');render();cleanup()});
+  setInterval(()=>{render();cleanup()},30000);
+}
+function setDate(d){if(!d)return;date=d;$('dateSel').value=d;sel=null;render()}
+function members(b){return b.studentIds?b.studentIds.length:1}
+function render(){renderPending();renderGrid();renderDetail()}
+function renderPending(){
+  const list=all.filter(b=>b.status==='pending').sort((a,b)=>(a.date+a.startTime).localeCompare(b.date+b.startTime));
+  $('pCount').textContent=list.length;
+  $('pending').innerHTML=list.length?list.map(b=>{const left=Math.round(((b.confirmDeadline||0)-Date.now())/60000);
+    return `<div class="border border-amber-300 bg-amber-50 rounded-lg p-2 text-xs"><b>${esc(b.roomName)}</b> · ${b.date} ${b.startTime}-${b.endTime}<br>${b.roomTitle?'🏷️ '+esc(b.roomTitle)+'<br>':''}ผู้จอง: ${esc(b.bookerName)} (${members(b)} คน${b.isShareable?' · แชร์':''})<br><span class="text-amber-700">เหลือเวลายืนยัน ${left>0?left+' นาที':'หมดเวลา'}</span>
+    <div class="flex gap-1 mt-1"><button onclick="approve('${b.id}')" class="px-2 py-1 bg-emerald-600 text-white rounded font-bold">✅ อนุมัติ</button><button onclick="reject('${b.id}')" class="px-2 py-1 bg-red-600 text-white rounded font-bold">ปฏิเสธ</button></div></div>`}).join(''):'<p class="text-xs text-gray-400">ไม่มีรายการรอยืนยัน</p>';
+}
+function renderGrid(){
+  const d=new Date(date+'T00:00:00'),wk=d.getDay()%6===0,open=(wk?9:8)*60,close=(wk?17:19)*60,now=new Date(),today=date===fmt(now),cur=now.getHours()*60+now.getMinutes();
+  let h='<tr><th class="sticky left-0 z-10 bg-white text-left pr-2 min-w-[100px]">ห้อง</th>';
+  for(let m=open;m<close;m+=60)h+=`<th colspan="4" class="text-[10px] font-normal text-left border-l pl-0.5">${M2T(m)}</th>`;
+  ROOMS.forEach(r=>{h+=`<tr><td class="sticky left-0 z-10 bg-white pr-2 py-0.5 whitespace-nowrap font-semibold">${r.name}</td>`;
+    for(let m=open;m<close;m+=15){const b=all.find(x=>x.roomId===r.id&&x.date===date&&m>=T2M(x.startTime)&&m<T2M(x.endTime));
+      const cls=b?(b.status==='pending'?'bg-amber-400':b.isShareable?'bg-pink-400':'bg-red-500')+' cursor-pointer':(today&&m<=cur?'bg-gray-300':'bg-emerald-400');
+      h+=`<td ${b?`onclick="pick('${b.id}')"`:''} title="${b?esc((b.roomTitle||'')+' '+b.startTime+'-'+b.endTime):M2T(m)}" class="h-6 min-w-[15px] border border-white ${cls}"></td>`}
+    h+='</tr>'});
+  $('grid').innerHTML=h;
+}
+function pick(id){sel=id;renderDetail();$('detail').scrollIntoView({behavior:'smooth'})}
+function renderDetail(){
+  const b=all.find(x=>x.id===sel),el=$('detail');if(!b){el.classList.add('hidden');return}
+  el.classList.remove('hidden');
+  el.innerHTML=`<b>${esc(b.roomName)}</b> · ${b.date} ${b.startTime}-${b.endTime} · <span class="font-bold">${b.status==='pending'?'🟡 รอยืนยัน':b.isShareable?'🌸 แชร์ได้':'🔴 ไม่ว่าง'}</span>
+  <div>ผู้จอง: ${esc(b.bookerName)} · รหัส: ${esc((b.studentIds||[]).join(', '))} (${members(b)}/12 คน)</div>
+  <div class="flex flex-wrap gap-2"><input id="dTitle" value="${esc(b.roomTitle||'')}" maxlength="40" placeholder="หัวข้อ/ชื่อห้อง" class="border rounded p-1.5"><button onclick="saveTitle('${b.id}')" class="px-3 py-1.5 bg-blue-600 text-white rounded">บันทึกหัวข้อ</button>
+  ${b.status==='pending'?`<button onclick="approve('${b.id}')" class="px-3 py-1.5 bg-emerald-600 text-white rounded font-bold">✅ อนุมัติ</button>`:''}
+  <button onclick="toggleShare('${b.id}')" class="px-3 py-1.5 border rounded">${b.isShareable?'เปลี่ยนเป็นส่วนตัว':'เปลี่ยนเป็นแชร์ได้'}</button>
+  <button onclick="del('${b.id}')" class="px-3 py-1.5 bg-red-600 text-white rounded">ลบคิว</button><button onclick="sel=null;renderDetail()" class="px-3 py-1.5 border rounded">ปิด</button></div>`;
+}
+const upd=(id,o)=>db.collection('bookings').doc(id).update(o).catch(e=>alert('ผิดพลาด: '+e.message));
+function approve(id){const b=all.find(x=>x.id===id);upd(id,{status:b.isShareable?'shareable':'occupied',approvedBy:auth.currentUser.email,approvedAt:firebase.firestore.FieldValue.serverTimestamp()})}
+async function reject(id){if(await askConfirm('ปฏิเสธและยกเลิกคิวนี้?'))upd(id,{status:'cancelled',cancelReason:'เจ้าหน้าที่ปฏิเสธ'})}
+function saveTitle(id){upd(id,{roomTitle:$('dTitle').value.trim().slice(0,40)})}
+function toggleShare(id){const b=all.find(x=>x.id===id);const s=!b.isShareable;upd(id,{isShareable:s,...(s?{}:{roomTitle:''}),...(b.status==='pending'?{}:{status:s?'shareable':'occupied'})})}
+async function del(id){if(await askConfirm('ลบคิวนี้?')){sel=null;db.collection('bookings').doc(id).delete()}}
+function cleanup(){const now=Date.now();all.forEach(b=>{const dl=b.confirmDeadline||(new Date(b.date+'T'+b.startTime+':00').getTime()+CONFIRM*60000);if(now<dl)return;
+  const r=ROOMS.find(x=>x.id===b.roomId),under=b.isShareable&&r&&r.cat!=='B'&&members(b)<MINM;
+  if(b.status==='pending'||under)upd(b.id,{status:'cancelled',cancelReason:b.status==='pending'?'ไม่ได้รับการยืนยันภายใน 15 นาที':'สมาชิกห้องแชร์ไม่ครบ 4 คน'})})}
+function walkIn(e){e.preventDefault();const id=$('wId').value.trim(),y=(new Date().getFullYear()+543)%100;
+  if(!/^\d{10}$/.test(id)||!id.endsWith('21')||+id.slice(0,2)<y-8||+id.slice(0,2)>y)return alert('รหัสนิสิตไม่ถูกต้อง (10 หลัก ลงท้าย 21 ปีย้อนหลังไม่เกิน 8 ปี)');
+  const st=$('wStart').value,en=$('wEnd').value;if(st>=en)return alert('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม');
+  const r=ROOMS.find(x=>x.id===$('wRoom').value);
+  if(all.some(b=>b.roomId===r.id&&b.date===date&&T2M(st)<T2M(b.endTime)&&T2M(en)>T2M(b.startTime)))return alert('ช่วงเวลานี้มีคิวอยู่แล้ว');
+  db.collection('bookings').add({roomId:r.id,roomName:r.name,date,startTime:st,endTime:en,bookerName:'Walk-in ('+id+')',bookerEmail:id+'@student.chula.ac.th',isShareable:false,roomTitle:'',status:'occupied',studentIds:[id],studentDetails:[{studentId:id,email:id+'@student.chula.ac.th',startTime:st,endTime:en}],createdBy:auth.currentUser.email,createdAt:firebase.firestore.FieldValue.serverTimestamp()}).then(()=>alert('บันทึก Walk-in แล้ว')).catch(e=>alert(e.message))}
+</script></body></html>
