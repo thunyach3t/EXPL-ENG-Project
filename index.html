@@ -72,11 +72,11 @@
       t.textContent = String(msg); c.appendChild(t); setTimeout(() => t.remove(), 5000);
     }
     window.alert = showToast;
-    function askConfirm(msg) {
+    function askConfirm(msg, ok = 'ยืนยัน') {
       return new Promise(res => {
         const o = document.createElement('div');
         o.className = 'fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4';
-        o.innerHTML = '<div class="bg-white dark:bg-chula-darkCard rounded-xl p-5 max-w-sm w-full text-sm"><p class="mb-4 whitespace-pre-line"></p><div class="flex justify-end gap-2"><button data-v="0" class="px-3 py-2 border rounded">ยกเลิก</button><button data-v="1" class="px-3 py-2 bg-chula-main text-white rounded font-bold">ยืนยัน</button></div></div>';
+        o.innerHTML = '<div class="bg-white dark:bg-chula-darkCard rounded-xl p-5 max-w-sm w-full text-sm"><p class="mb-4 whitespace-pre-line"></p><div class="flex justify-end gap-2"><button data-v="0" class="px-3 py-2 border rounded">ยกเลิก</button><button data-v="1" class="px-3 py-2 bg-chula-main text-white rounded font-bold">' + ok + '</button></div></div>';
         o.querySelector('p').textContent = msg;
         o.onclick = e => { const v = e.target.dataset && e.target.dataset.v; if (v !== undefined) { o.remove(); res(v === '1'); } };
         document.body.appendChild(o);
@@ -246,6 +246,13 @@
         </button>
       </div>
       <div id="libraryStatusBanner" class="text-xs text-center font-semibold py-1.5 px-3 rounded-md"></div>
+    </div>
+
+    <!-- My bookings -->
+    <div id="myBookingsCard" class="hidden bg-white dark:bg-chula-darkCard p-4 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800">
+      <div class="font-bold text-sm mb-1">📋 การจองของฉัน</div>
+      <div id="myQuota" class="text-[11px] text-gray-500 mb-2"></div>
+      <div id="myBookingsList" class="space-y-2"></div>
     </div>
 
     <!-- Quick booking grid -->
@@ -421,6 +428,10 @@
 
   <script>
     const MAX_MEMBERS = 12, MIN_MEMBERS = 4, CONFIRM_MINS = 15;
+    // ใส่ลิงก์ LINE OA ของห้องสมุดตรงนี้ (เช่น 'https://lin.ee/xxxx') ถ้าเว้นว่างจะไม่แสดงลิงก์
+    const LINE_OA_URL = '';
+    const QUOTA_MSG = '⏱ ใช้โควตาครบ 2 ชั่วโมงต่อวันแล้ว\nโปรดติดต่อเคาน์เตอร์เพื่อจองเพิ่มเติม เจ้าหน้าที่จะลงคิว Walk-in ให้';
+    var cancelledMine = {};
 
     const ALL_ROOMS = [
       { id: 'sem_a', name: 'Seminar Room A', category: 'Seminar Room' },
@@ -459,7 +470,7 @@
       }
     }
 
-    function updateAuthCornerUI(isLoggedIn) {
+    function updateAuthCornerUI(isLoggedIn) { setTimeout(() => { renderMyBookings(); updateNotificationBellHub(); }, 0);
       const adminBanner = document.getElementById('adminPanelBanner');
       if (isLoggedIn && currentUser) {
         document.getElementById('btnLoginCorner').classList.add('hidden');
@@ -543,7 +554,7 @@
         realTimeBookings = [];
         snapshot.forEach(doc => {
           const data = doc.data();
-          if (data.status === 'cancelled') return;
+          if (data.status === 'cancelled') { if (currentUser && data.studentIds && data.studentIds.includes(currentUser.studentId) && data.date >= formatDateISO(new Date())) cancelledMine[doc.id] = { id: doc.id, ...data }; return; }
           const startM = timeToMins(data.startTime);
           const endM = timeToMins(data.endTime);
           const duration = endM - startM;
@@ -672,7 +683,8 @@
       );
       const mySubmittedReqs = realTimeRequests.filter(r => r.requesterEmail === currentUser.email && r.status !== 'pending');
 
-      const totalCount = incomingReqs.length + mySubmittedReqs.length;
+      const sysN = systemNotices();
+      const totalCount = incomingReqs.length + mySubmittedReqs.length + sysN.length;
       const badge = document.getElementById('notiBadge');
       const badgeMob = document.getElementById('notiBadgeMob');
       const countLabel = document.getElementById('notiCountLabel');
@@ -695,7 +707,7 @@
         return;
       }
 
-      let html = '';
+      let html = sysN.join('');
       incomingReqs.forEach(req => {
         const timeStr = req.createdAt ? new Date(req.createdAt.seconds * 1000).toLocaleString('th-TH', { hour:'2-digit', minute:'2-digit', day:'numeric', month:'short' }) : '';
         if (req.type === 'share') {
@@ -944,7 +956,7 @@
     function renderAllOverviewGrids() {
       renderRealtimeOverviewGrid();
       renderAccordionRooms();
-      renderLiveGrid();
+      renderLiveGrid(); renderMyBookings(); notifyChanges();
       if (selectedRoom) renderTimeSlots();
       refreshOpenRoomQueue();
     }
@@ -1305,6 +1317,7 @@
       
       const stdId = currentUser ? currentUser.studentId : null;
       const usedMins = getUserTotalBookedMinutesOnDate(stdId, selectedDateStr);
+      if (usedMins >= 120 && !(currentUser && currentUser.isAdmin)) { alert(QUOTA_MSG); return; }
       const remainingQuota = Math.max(15, 120 - usedMins);
       
       const nextBusy = realTimeBookings.filter(b => b.roomId === selectedRoom.id && b.date === selectedDateStr && timeToMins(b.startTime) > startMins).map(b => timeToMins(b.startTime));
@@ -1345,7 +1358,7 @@
       const currentUsed = getUserTotalBookedMinutesOnDate(currentUser.studentId, selectedDateStr);
 
       if (currentUsed + requestedMins > 120) {
-        alert('❌ เกินโควตาส่วนตัว 2 ชั่วโมงต่อวัน');
+        alert(QUOTA_MSG);
         return;
       }
 
@@ -1382,6 +1395,10 @@
         allStudents = rawInputs;
       }
 
+      for (const id of allStudents) {
+        if (hasUserConflictOnTimeSlot(id, selectedDateStr, selectedStartTime, endTime)) { alert(`❌ รหัส ${id} มีคิวจองห้องอื่นซ้อนช่วงเวลานี้อยู่แล้ว (1 รหัสจองได้ทีละห้องในเวลาเดียวกัน)`); return; }
+        if (getUserTotalBookedMinutesOnDate(id, selectedDateStr) + requestedMins > 120) { alert(`❌ รหัส ${id} จะเกินโควตา 2 ชั่วโมงต่อวัน\nโปรดติดต่อเคาน์เตอร์เพื่อจองเพิ่มเติม`); return; }
+      }
       const studentDetails = allStudents.map(id => ({
         studentId: id,
         email: `${id}@student.chula.ac.th`,
@@ -1510,7 +1527,7 @@
 
       const usedMins = getUserTotalBookedMinutesOnDate(currentUser.studentId, selectedDateStr);
       if (usedMins >= 120) {
-        alert('❌ คุณใช้โควตาจองครบ 2 ชั่วโมงแล้ว จึงไม่สามารถยื่นขอคิวได้');
+        alert(QUOTA_MSG);
         return;
       }
 
@@ -1690,7 +1707,11 @@
       const room = ALL_ROOMS.find(r => r.id === roomId);
       const s = timeToMins(time), close = (isWeekendString(selectedDateStr) ? 17 : 19) * 60;
       const used = currentUser && !currentUser.isAdmin ? getUserTotalBookedMinutesOnDate(currentUser.studentId, selectedDateStr) : 0;
-      const opts = [30, 60, 90, 120].filter(d => {
+      if (used >= 120) {
+        document.getElementById('modalContent').innerHTML = `<h3 class="font-bold text-chula-main text-base mb-2">⏱ โควตาเต็มแล้ว</h3><p class="text-sm whitespace-pre-line mb-4">${QUOTA_MSG}</p>${LINE_OA_URL ? `<a href="${LINE_OA_URL}" target="_blank" rel="noopener" class="block text-center py-2 mb-2 rounded-lg bg-green-500 text-white font-bold text-sm">💬 ทักไลน์ OA</a>` : ''}<button onclick="closeModal()" class="w-full py-2 bg-gray-200 text-gray-700 rounded-lg text-sm">ปิด</button>`;
+        document.getElementById('modalOverlay').classList.remove('hidden'); return;
+      }
+      const opts = [15, 30, 60, 90, 120].filter(d => {
         if (s + d > close || used + d > 120) return false;
         for (let m = s; m < s + d; m += 15) if (getBookingAt(roomId, m)) return false;
         return true;
@@ -1718,25 +1739,26 @@
     function renderLiveGrid() {
       const open = (isWeekendString(selectedDateStr) ? 9 : 8) * 60, close = (isWeekendString(selectedDateStr) ? 17 : 19) * 60;
       const now = new Date(), isToday = selectedDateStr === formatDateISO(now), cur = now.getHours() * 60 + now.getMinutes();
-      const cols = []; for (let m = open; m < close; m += 30) cols.push(m);
       const sticky = 'sticky left-0 z-10 bg-white dark:bg-chula-darkCard';
-      let h = `<tr><th class="${sticky}"></th>` + cols.map(m => `<th class="font-normal text-[10px] text-left min-w-[46px] ${isToday && cur >= m && cur < m + 30 ? 'text-chula-main font-bold' : 'text-gray-500'}">${m % 60 === 0 ? minsToTime(m) : ''}</th>`).join('') + '</tr>';
+      let h = `<tr><th class="${sticky}"></th>`;
+      for (let m = open; m < close; m += 60) h += `<th colspan="4" class="font-normal text-[10px] text-left pl-1 ${isToday && cur >= m && cur < m + 60 ? 'text-chula-main font-bold' : 'text-gray-500'}">${minsToTime(m)}</th>`;
+      h += '</tr>';
       let lastCat = '';
       ALL_ROOMS.forEach(r => {
         if (r.category !== lastCat) { lastCat = r.category; h += `<tr><td class="${sticky} pt-2 text-[11px] font-bold text-chula-main dark:text-red-400 whitespace-nowrap">${r.category}</td></tr>`; }
         h += `<tr><td class="${sticky} pr-2 whitespace-nowrap font-semibold text-[11px]">${r.name.replace('Seminar Room ', 'Sem ').replace('Study Room ', 'Study ').replace('The Box ', 'Box ')}</td>`;
-        cols.forEach(m => {
-          const free = [m, m + 15].find(x => !(isToday && x <= cur) && !getBookingAt(r.id, x));
-          const b = getBookingAt(r.id, m) || getBookingAt(r.id, m + 15);
-          let cls = 'bg-gray-200 dark:bg-gray-700', act = '', tip = '';
-          if (free !== undefined) { cls = 'bg-emerald-400 hover:bg-emerald-500 cursor-pointer'; act = `quickBook('${r.id}','${minsToTime(free)}')`; tip = 'จองเริ่ม ' + minsToTime(free); }
-          else if (b) { cls = (b.status === 'pending' ? 'bg-amber-400' : b.isShareable ? 'bg-pink-400' : 'bg-red-500') + ' cursor-pointer'; act = `openRoomQueue('${r.id}')`; tip = (b.roomTitle ? b.roomTitle + ' · ' : '') + b.startTime + '-' + b.endTime; }
-          h += `<td ${act ? `onclick="${act}"` : ''} title="${escapeHtml(tip)}" class="h-9 min-w-[46px] rounded-md ${cls}"></td>`;
-        });
+        for (let m = open; m < close; m += 15) {
+          const b = getBookingAt(r.id, m), t = minsToTime(m);
+          let cls, act = '', tip = t;
+          if (b) { cls = (b.status === 'pending' ? 'bg-amber-400' : b.isShareable ? 'bg-pink-400' : 'bg-red-500') + ' cursor-pointer'; act = `openRoomQueue('${r.id}')`; tip = (b.roomTitle ? b.roomTitle + ' · ' : '') + b.startTime + '-' + b.endTime; }
+          else if (isToday && m <= cur) cls = 'bg-gray-200 dark:bg-gray-700';
+          else { cls = 'bg-emerald-400 hover:bg-emerald-500 cursor-pointer'; act = `quickBook('${r.id}','${t}')`; tip = 'จองเริ่ม ' + t; }
+          h += `<td ${act ? `onclick="${act}"` : ''} title="${escapeHtml(tip)}" class="h-9 min-w-[26px] rounded-md bg-clip-padding ${m % 60 === 0 ? 'border-l-[3px] border-transparent' : ''} ${cls}"></td>`;
+        }
         h += '</tr>';
       });
       document.getElementById('liveGrid').innerHTML = h;
-      if (isToday && !window._gridScrolled) { document.getElementById('liveGridScroll').scrollLeft = Math.max(0, (cur - open) / 30 * 48 - 80); window._gridScrolled = true; }
+      if (isToday && !window._gridScrolled) { document.getElementById('liveGridScroll').scrollLeft = Math.max(0, (cur - open) / 15 * 28 - 90); window._gridScrolled = true; }
     }
 
     // ยกเลิกอัตโนมัติ: ไม่ได้รับการยืนยันภายใน 15 นาที หรือห้องแชร์สมาชิกไม่ครบ 4 คน
@@ -1753,7 +1775,69 @@
         } catch (e) { }
       }
     }
-    setInterval(() => { cleanupExpiredBookings(); renderLiveGrid(); }, 30000);
+    setInterval(() => { cleanupExpiredBookings(); renderLiveGrid(); renderMyBookings(); notifyChanges(); updateNotificationBellHub(); }, 30000);
+
+    // ===== การจองของฉัน / คำขอยกเลิก / แจ้งเตือน =====
+    const clockOf = ms => new Date(ms).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const tsOf = (d, t) => new Date(`${d}T${t}:00`).getTime();
+    function fmtLeft(ms) { const m = Math.max(1, Math.ceil(ms / 60000)); return m >= 60 ? `${Math.floor(m / 60)} ชม. ${m % 60} นาที` : `${m} นาที`; }
+    function myBookingsList() {
+      if (!currentUser || currentUser.isAdmin) return [];
+      return realTimeBookings.filter(b => b.studentIds && b.studentIds.includes(currentUser.studentId)).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
+    }
+    function renderMyBookings() {
+      const card = document.getElementById('myBookingsCard');
+      if (!currentUser || currentUser.isAdmin) { card.classList.add('hidden'); return; }
+      card.classList.remove('hidden');
+      const now = Date.now(), used = getUserTotalBookedMinutesOnDate(currentUser.studentId, selectedDateStr);
+      document.getElementById('myQuota').innerHTML = `โควตาวันที่ ${selectedDateStr} ใช้ไปแล้ว <b>${used}/120</b> นาที` + (used >= 120 ? `<div class="mt-1 text-red-600 font-semibold whitespace-pre-line">${QUOTA_MSG}</div>` : '') + (LINE_OA_URL ? ` · <a class="text-green-600 font-bold" href="${LINE_OA_URL}" target="_blank" rel="noopener">💬 ทักไลน์ OA</a>` : '');
+      const list = myBookingsList().filter(b => tsOf(b.date, b.endTime) > now);
+      document.getElementById('myBookingsList').innerHTML = list.length ? list.map(b => {
+        const s = tsOf(b.date, b.startTime), e = tsOf(b.date, b.endTime), cr = b.cancelRequest && b.cancelRequest.status;
+        const left = b.status === 'pending' ? `<span class="text-amber-700">🟡 รอยืนยัน · ยืนยันภายใน ${clockOf(b.confirmDeadline || s + 900000)} น.</span>`
+          : s > now ? `<span class="text-gray-600">เริ่มในอีก ${fmtLeft(s - now)}</span>` : `<span class="text-emerald-600 font-semibold">● กำลังใช้งาน · เหลือ ${fmtLeft(e - now)}</span>`;
+        const act = cr === 'requested' ? '<span class="text-gray-500">⏳ ส่งคำขอยกเลิกแล้ว รอแอดมินพิจารณา</span>'
+          : `${cr === 'rejected' ? '<span class="text-red-600 mr-2">❌ แอดมินไม่อนุมัติการยกเลิก</span>' : ''}<button onclick="requestCancel('${b.id}')" class="px-2.5 py-1 border border-red-400 text-red-600 rounded font-bold">ส่งคำขอยกเลิก</button>`;
+        return `<div class="p-3 border rounded-lg text-xs bg-gray-50 dark:bg-gray-800"><div class="font-bold text-sm">${escapeHtml(b.roomName)}${b.roomTitle ? ' · 🏷️ ' + escapeHtml(b.roomTitle) : ''}</div><div>📅 ${b.date} · 🕒 ${b.startTime}-${b.endTime} น.</div><div class="mt-0.5">${left}</div><div class="mt-2">${act}</div></div>`;
+      }).join('') : '<p class="text-xs text-gray-400">ยังไม่มีการจองที่ใช้งานอยู่</p>';
+    }
+    async function requestCancel(id) {
+      const b = realTimeBookings.find(x => x.id === id); if (!b) return;
+      const oa = LINE_OA_URL ? `\nหรือทักไลน์ OA โดยตรง: ${LINE_OA_URL}` : '\n(สามารถทักไลน์ OA ของห้องสมุดโดยตรงได้)';
+      if (!(await askConfirm(`ส่งคำขอยกเลิก ${b.roomName} ${b.date} ${b.startTime}-${b.endTime}?\nแอดมินจะเป็นผู้อนุมัติหรือไม่อนุมัติ${oa}`, 'ส่งคำขอยกเลิก'))) return;
+      await db.collection('bookings').doc(id).update({ cancelRequest: { status: 'requested', by: currentUser.studentId, at: Date.now() } });
+      alert('ส่งคำขอยกเลิกแล้ว รอแอดมินพิจารณา');
+    }
+    function systemNotices() {
+      if (!currentUser || currentUser.isAdmin) return [];
+      const now = Date.now(), out = [], box = (i, t, c) => `<div class="py-2 ${c}">${i} ${t}</div>`;
+      myBookingsList().forEach(b => {
+        const s = tsOf(b.date, b.startTime), e = tsOf(b.date, b.endTime), nm = `${escapeHtml(b.roomName)} ${b.startTime}-${b.endTime}`;
+        if (e <= now) return;
+        if (b.status === 'pending') out.push(box('🟡', `<b>${nm}</b> รอยืนยัน มาที่เคาน์เตอร์ภายใน ${clockOf(b.confirmDeadline || s + 900000)} น.`, 'text-amber-700'));
+        else if (s > now && s - now <= 30 * 60000) out.push(box('⏰', `<b>${nm}</b> เริ่มในอีก ${fmtLeft(s - now)}`, ''));
+        else if (s <= now && e - now <= 10 * 60000) out.push(box('⌛', `<b>${nm}</b> เหลือเวลา ${fmtLeft(e - now)}`, 'text-red-600'));
+        const cr = b.cancelRequest && b.cancelRequest.status;
+        if (cr === 'rejected') out.push(box('❌', `แอดมินไม่อนุมัติการยกเลิก <b>${nm}</b>`, 'text-red-600'));
+        if (cr === 'requested') out.push(box('⏳', `ส่งคำขอยกเลิก <b>${nm}</b> แล้ว รอแอดมิน`, 'text-gray-500'));
+      });
+      Object.values(cancelledMine).forEach(b => { if (tsOf(b.date, b.endTime) > now && b.studentIds.includes(currentUser.studentId)) out.push(box('🚫', `<b>${escapeHtml(b.roomName)} ${b.startTime}-${b.endTime}</b> ถูกยกเลิก: ${escapeHtml(b.cancelReason || '')}`, 'text-red-600')); });
+      return out;
+    }
+    let _prev = {}, _prevUser = null; const _reminded = {};
+    function notifyChanges() {
+      if (!currentUser || currentUser.isAdmin) { _prev = {}; return; }
+      if (_prevUser !== currentUser.studentId) { _prev = {}; _prevUser = currentUser.studentId; }
+      const now = Date.now(), cur = {};
+      myBookingsList().forEach(b => {
+        cur[b.id] = b; const p = _prev[b.id], nm = `${b.roomName} ${b.startTime}-${b.endTime}`, s = tsOf(b.date, b.startTime);
+        if (p && p.status === 'pending' && b.status !== 'pending') alert(`✅ แอดมินยืนยันการจอง ${nm} แล้ว`);
+        if (p && p.cancelRequest && p.cancelRequest.status === 'requested' && b.cancelRequest && b.cancelRequest.status === 'rejected') alert(`❌ แอดมินไม่อนุมัติการยกเลิก ${nm}`);
+        if (s > now && s - now <= 15 * 60000 && !_reminded[b.id]) { _reminded[b.id] = 1; alert(`⏰ ${nm} จะเริ่มในอีก ${fmtLeft(s - now)}`); }
+      });
+      Object.keys(_prev).forEach(id => { if (!cur[id] && cancelledMine[id]) alert(`🚫 ${_prev[id].roomName} ${_prev[id].startTime}-${_prev[id].endTime} ถูกยกเลิก: ${cancelledMine[id].cancelReason || ''}`); });
+      _prev = cur;
+    }
   </script>
 </body>
 </html>
