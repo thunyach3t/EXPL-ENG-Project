@@ -270,7 +270,7 @@
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center space-x-2 text-base font-bold">
           <i class="fa-solid fa-chart-simple text-chula-main dark:text-red-400"></i>
-          <span>สถานะห้องตอนนี้ (Real-time Overview)</span>
+          <span>สถานะห้องตอนนี้ (Real-time Overview) <span class="text-xs font-normal text-gray-500">· แตะที่ห้องเพื่อจอง</span></span>
         </div>
         <div class="flex flex-wrap gap-2 text-xs font-semibold">
           <span class="px-2.5 py-1 rounded-full border border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 flex items-center gap-1.5">
@@ -812,12 +812,21 @@
       const req = realTimeRequests.find(r => r.id === reqId);
       if (!req) return;
 
-      const parentBooking = realTimeBookings.find(b => b.roomId === req.roomId && b.date === req.date);
+      const parentBooking = realTimeBookings.find(b => req.bookingId ? b.id === req.bookingId : (b.roomId === req.roomId && b.date === req.date));
       if (!parentBooking) { alert('ไม่พบข้อมูลการจองเดิม'); return; }
 
       let studentIds = parentBooking.studentIds || [];
       let studentDetails = parentBooking.studentDetails || [];
       const reqStudentId = req.requesterEmail.split('@')[0];
+      if (!(parentBooking.studentIds || []).includes(reqStudentId)) {
+        const clash = hasUserConflictOnTimeSlot(reqStudentId, req.date, req.reqStartTime, req.reqEndTime);
+        const over = getUserTotalBookedMinutesOnDate(reqStudentId, req.date) + (timeToMins(req.reqEndTime) - timeToMins(req.reqStartTime)) > 120;
+        if (clash || over) {
+          await db.collection('queue_requests').doc(reqId).update({ status: 'rejected' });
+          alert(clash ? '❌ ผู้ขอเข้าร่วมมีคิวห้องอื่นซ้อนเวลานี้อยู่แล้ว ระบบปฏิเสธคำขอให้' : '❌ ผู้ขอเข้าร่วมใช้โควตาครบ 2 ชั่วโมงแล้ว ระบบปฏิเสธคำขอให้');
+          return;
+        }
+      }
 
       if (studentIds.length >= MAX_MEMBERS) {
         alert('❌ สมาชิกในห้องเต็ม Limit (12 คน) แล้ว');
@@ -1178,7 +1187,7 @@
         const curB = libInfo.isClosed ? null : getCurrentRoomBooking(room.id, selectedDateStr);
         const nfText = libInfo.isClosed ? '' : nextFreeLabel(getRoomNextFree(room.id, selectedDateStr));
         return `
-          <div onclick="openRoomQueue('${room.id}')" 
+          <div onclick="openRoomFromCard('${room.id}')" 
             class="p-3 border-2 rounded-xl text-center cursor-pointer hover:scale-105 transition transform flex flex-col justify-center items-center min-h-[6rem] ${colorClasses}">
             <div class="font-bold text-xs sm:text-sm truncate w-full">${room.name}</div>
             <div class="text-[11px] font-semibold mt-0.5">${status}</div>
@@ -1495,22 +1504,22 @@
       if (!bookingObj) return;
 
       if (bookingObj.bookerEmail === currentUser.email) {
-        alert('❌ คุณไม่สามารถกดขอจองร่วมกับห้องที่ตนเองเป็นผู้จองได้ครับ');
+        showInfoModal('ℹ️ ไม่สามารถทำรายการได้', '❌ คุณไม่สามารถกดขอจองร่วมกับห้องที่ตนเองเป็นผู้จองได้ครับ');
         return;
       }
 
       if (bookingObj.studentIds && bookingObj.studentIds.includes(currentUser.studentId)) {
-        alert('❌ คุณเป็นสมาชิกในห้องนี้อยู่แล้ว');
+        showInfoModal('ℹ️ ไม่สามารถทำรายการได้', '❌ คุณเป็นสมาชิกในห้องนี้อยู่แล้ว');
         return;
       }
 
       if (bookingObj.studentIds && bookingObj.studentIds.length >= MAX_MEMBERS) {
-        alert('❌ ห้องนี้มีผู้ใช้งานเต็ม Limit (12 คน) แล้ว');
+        showInfoModal('ℹ️ ไม่สามารถทำรายการได้', '❌ ห้องนี้มีผู้ใช้งานเต็ม Limit (12 คน) แล้ว');
         return;
       }
 
       if (hasUserConflictOnTimeSlot(currentUser.studentId, selectedDateStr, rangeStart, rangeEnd)) {
-        alert('❌ คุณมีคิวจองหรือใช้งานห้องอื่นในช่วงเวลานี้อยู่แล้ว');
+        showInfoModal('ℹ️ ไม่สามารถทำรายการได้', '❌ คุณมีคิวจองหรือใช้งานห้องอื่นในช่วงเวลานี้อยู่แล้ว');
         return;
       }
 
@@ -1560,7 +1569,17 @@
         return;
       }
 
+      const me = currentUser && currentUser.studentId;
+      if (!me) { alert('กรุณาเข้าสู่ระบบก่อน'); return; }
+      if ((bookingObj.studentIds || []).includes(me)) { showInfoModal('คุณอยู่ในห้องนี้แล้ว', `${bookingObj.roomName} ${bookingObj.startTime}-${bookingObj.endTime} น.`); return; }
+      if ((bookingObj.studentIds || []).length >= MAX_MEMBERS) { showInfoModal('ห้องเต็มแล้ว', 'ห้องนี้มีสมาชิกครบ 12 คนแล้ว'); return; }
+      if (shareStart < bookingObj.startTime || shareEnd > bookingObj.endTime) { alert('เวลาที่ขอเข้าร่วมต้องอยู่ในช่วงของห้องนี้ (' + bookingObj.startTime + '-' + bookingObj.endTime + ')'); return; }
+      const joinMins = timeToMins(shareEnd) - timeToMins(shareStart);
+      if (getUserTotalBookedMinutesOnDate(me, bookingObj.date) + joinMins > 120) { showInfoModal('⏱ โควตาเต็มแล้ว', QUOTA_MSG); return; }
+      if (hasUserConflictOnTimeSlot(me, bookingObj.date, shareStart, shareEnd)) { showInfoModal('📌 คุณมีคิวจองช่วงนี้อยู่แล้ว', '1 รหัสอยู่ได้ทีละห้องในเวลาเดียวกัน'); return; }
+      if (realTimeRequests.some(r => r.bookingId === bookingObj.id && r.requesterEmail === currentUser.email && r.status === 'pending')) { alert('คุณส่งคำขอเข้าร่วมห้องนี้ไว้แล้ว รอผู้จองพิจารณา'); return; }
       await db.collection("queue_requests").add({
+        bookingId: bookingObj.id,
         type: 'share',
         roomId: bookingObj.roomId,
         roomName: bookingObj.roomName,
@@ -1581,12 +1600,12 @@
 
       const usedMins = getUserTotalBookedMinutesOnDate(currentUser.studentId, selectedDateStr);
       if (usedMins >= 120) {
-        alert(QUOTA_MSG);
+        showInfoModal('ℹ️ ไม่สามารถทำรายการได้', QUOTA_MSG);
         return;
       }
 
       if (hasUserConflictOnTimeSlot(currentUser.studentId, selectedDateStr, rangeStart, rangeEnd)) {
-        alert('❌ คุณมีคิวจองห้องอื่นในช่วงเวลานี้อยู่แล้ว');
+        showInfoModal('ℹ️ ไม่สามารถทำรายการได้', '❌ คุณมีคิวจองห้องอื่นในช่วงเวลานี้อยู่แล้ว');
         return;
       }
 
@@ -1753,6 +1772,14 @@
       for (let i = 7; i <= 12; i++) c.insertAdjacentHTML('beforeend', `<div id="wrap_std${i}"><label class="block text-xs text-gray-500 mb-1">คนที่ ${i}</label><input type="text" id="studentId${i}" maxlength="10" placeholder="รหัสนิสิต 10 หลัก" class="w-full p-2.5 border rounded-lg bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-white text-sm"></div>`);
     })();
 
+    // แตะการ์ดห้อง: ไปหน้าจองทันทีที่เวลาว่างเร็วสุด (ห้องแชร์ที่กำลังใช้งานและยังรับคนได้ -> ไปหน้าคิวเพื่อขอเข้าร่วม)
+    function openRoomFromCard(roomId) {
+      const cur = getCurrentRoomBooking(roomId, selectedDateStr);
+      if (cur && cur.isShareable && (cur.studentIds || []).length < MAX_MEMBERS) { openRoomQueue(roomId); return; }
+      const nf = getRoomNextFree(roomId, selectedDateStr);
+      if (nf.state === 'ok' && !isRoomClosed(roomId)) quickBook(roomId, nf.time); else openRoomQueue(roomId);
+    }
+
     function getBookingAt(roomId, mins) {
       return realTimeBookings.find(x => x.roomId === roomId && x.date === selectedDateStr && mins >= timeToMins(x.startTime) && mins < timeToMins(x.endTime));
     }
@@ -1782,7 +1809,8 @@
         <p class="text-xs text-gray-500 mb-3">${selectedDateStr} · เริ่ม ${time} น. · เลือกระยะเวลา</p>
         <div class="grid grid-cols-2 gap-2">
           ${opts.map(d => `<button onclick="goQuickBook('${roomId}','${time}',${d})" class="py-3 rounded-xl border-2 border-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 font-bold text-sm"><div>${label(d)}</div><div class="text-[11px] font-normal text-gray-500">ถึง ${minsToTime(s + d)} น.</div></button>`).join('')}
-        </div>`;
+        </div>
+        <button onclick="openRoomQueue('${roomId}')" class="mt-3 w-full py-2 text-xs border rounded-lg text-gray-600 dark:text-gray-300">📋 ดูคิวของห้องนี้ / ขอเข้าร่วมห้องแชร์</button>`;
       document.getElementById('modalOverlay').classList.remove('hidden');
     }
 
