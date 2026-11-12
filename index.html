@@ -61,9 +61,9 @@
     };
     // ---- ตัวช่วยที่ทำงานได้ทุกสภาพแวดล้อม (ไม่พังถ้าเบราว์เซอร์บล็อกสิ่งเหล่านี้) ----
     const _mem = {};
-    function safeGet(k) { try { return safeGet(k); } catch (e) { return _mem[k] || null; } }
-    function safeSet(k, v) { try { safeSet(k, v); } catch (e) { _mem[k] = v; } }
-    function safeDel(k) { try { safeDel(k); } catch (e) { delete _mem[k]; } }
+    function safeGet(k) { try { return localStorage.getItem(k); } catch (e) { return _mem[k] || null; } }
+    function safeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { _mem[k] = v; } }
+    function safeDel(k) { try { localStorage.removeItem(k); } catch (e) { delete _mem[k]; } }
     function showToast(msg) {
       let c = document.getElementById('toastBox');
       if (!c) { c = document.createElement('div'); c.id = 'toastBox'; c.className = 'fixed top-3 left-1/2 -translate-x-1/2 z-[100] space-y-2 w-[92%] max-w-sm pointer-events-none'; document.body.appendChild(c); }
@@ -260,7 +260,7 @@
       <div class="font-bold text-sm mb-0.5">⚡ จองด่วน · ตารางเรียลไทม์</div>
       <p class="text-[11px] text-gray-500 mb-2">แตะช่อง<b class="text-emerald-600">สีเขียว</b>เพื่อจอง · แตะช่องสีอื่นเพื่อดูคิวของห้อง</p>
       <div class="flex flex-wrap gap-x-3 gap-y-1 text-[11px] mb-2">
-        <span><i class="inline-block w-3 h-3 rounded bg-emerald-400 align-middle"></i> ว่าง</span><span><i class="inline-block w-3 h-3 rounded bg-amber-400 align-middle"></i> รอยืนยัน</span><span><i class="inline-block w-3 h-3 rounded bg-red-500 align-middle"></i> ไม่ว่าง</span><span><i class="inline-block w-3 h-3 rounded bg-pink-400 align-middle"></i> แชร์ได้</span><span><i class="inline-block w-3 h-3 rounded bg-gray-300 align-middle"></i> เลยเวลา</span>
+        <span><i class="inline-block w-3 h-3 rounded bg-emerald-400 align-middle"></i> ว่าง</span><span><i class="inline-block w-3 h-3 rounded bg-amber-400 align-middle"></i> รอยืนยัน</span><span><i class="inline-block w-3 h-3 rounded bg-red-500 align-middle"></i> ไม่ว่าง</span><span><i class="inline-block w-3 h-3 rounded bg-pink-400 align-middle"></i> แชร์ได้ (เข้าร่วมได้แม้รอยืนยัน)</span><span><i class="inline-block w-3 h-3 rounded bg-gray-300 align-middle"></i> เลยเวลา</span>
       </div>
       <div id="liveGridScroll" class="overflow-x-auto"><table id="liveGrid" class="w-max border-separate text-xs" style="border-spacing:2px"></table></div>
     </div>
@@ -464,8 +464,8 @@
     function checkStoredUserSession() {
       const savedUser = safeGet('chula_user_session');
       if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        updateAuthCornerUI(true);
+        try { currentUser = JSON.parse(savedUser); if (!currentUser || !currentUser.studentId) throw 0; } catch (e) { currentUser = null; safeDel('chula_user_session'); }
+        updateAuthCornerUI(!!currentUser);
       } else {
         updateAuthCornerUI(false);
       }
@@ -564,7 +564,7 @@
           const weekend = isWeekendString(data.date);
         const minOpeningMins = Math.min(weekend ? 9 * 60 : 8 * 60, getDayHours(data.date).open * 60);
 
-          if (duration > 240 || (data.startTime === "00:00" && data.endTime === "23:59") || startM < minOpeningMins) {
+          if ((duration > 240 && data.source !== 'admin') || (data.startTime === "00:00" && data.endTime === "23:59") || startM < minOpeningMins) {
             db.collection("bookings").doc(doc.id).delete();
             return;
           }
@@ -675,6 +675,16 @@
       ALL_ROOMS.length = 0; ALL_ROOMS_ALL.filter(r => hid[r.name] !== true).forEach(r => ALL_ROOMS.push(r));
       applyAnnouncement();
       try { renderAllOverviewGrids(); } catch (e) { }
+    }
+
+    function showInfoModal(title, text) {
+      document.getElementById('modalContent').innerHTML = `<h3 class="font-bold text-chula-main dark:text-red-400 text-base mb-2">${title}</h3><p class="text-sm whitespace-pre-line mb-4">${escapeHtml(text)}</p>${LINE_OA_URL ? `<a href="${LINE_OA_URL}" target="_blank" rel="noopener" class="block text-center py-2 mb-2 rounded-lg bg-green-500 text-white font-bold text-sm">💬 ทักไลน์ OA</a>` : ''}<button onclick="closeModal()" class="w-full py-2 bg-gray-200 text-gray-700 rounded-lg text-sm">ปิด</button>`;
+      document.getElementById('modalOverlay').classList.remove('hidden');
+    }
+    function ownBookingAt(dateStr, time) {
+      if (!currentUser || currentUser.isAdmin) return null;
+      const m = timeToMins(time);
+      return realTimeBookings.find(b => b.date === dateStr && b.studentIds && b.studentIds.includes(currentUser.studentId) && m >= timeToMins(b.startTime) && m < timeToMins(b.endTime)) || null;
     }
 
     function getLibraryStatusInfo() {
@@ -1016,8 +1026,8 @@
         const endM = timeToMins(b.endTime);
 
         if (currentMins >= startM && currentMins < endM) {
-          if (b.status === 'pending') return 'รอการยืนยัน';
           if (b.isShareable) return 'แชร์ร่วมกันได้';
+          if (b.status === 'pending') return 'รอการยืนยัน';
           return 'ไม่ว่าง';
         }
       }
@@ -1091,7 +1101,7 @@
         const members = b.studentIds ? b.studentIds.length : 1;
         const stateTag = done ? '<span class="px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 dark:bg-gray-700">เสร็จแล้ว</span>'
           : live ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold">● กำลังใช้งาน</span>'
-          : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">รอคิว</span>';
+          : (b.status === 'pending' ? '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">⏳ รอยืนยัน</span>' : '<span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">ยืนยันแล้ว</span>');
         const typeTag = b.isShareable
           ? `<span class="text-pink-600 font-bold">🤝 แชร์ได้ ${members}/12 คน</span>`
           : '<span class="text-red-600 font-bold">🔒 ส่วนตัว</span>';
@@ -1173,6 +1183,7 @@
             <div class="font-bold text-xs sm:text-sm truncate w-full">${room.name}</div>
             <div class="text-[11px] font-semibold mt-0.5">${status}</div>
             ${curB && curB.roomTitle ? `<div class="text-[10px] truncate w-full">🏷️ ${escapeHtml(curB.roomTitle)}</div>` : ''}
+            ${curB && curB.isShareable && curB.status === 'pending' ? '<div class="text-[10px] font-semibold">⏳ รอยืนยัน</div>' : ''}
             ${nfText ? `<div class="text-[10px] opacity-80 mt-0.5">⏱ ${nfText}</div>` : ''}
           </div>
         `;
@@ -1270,7 +1281,7 @@
             const memberCount = booked.studentIds ? booked.studentIds.length : 1;
             btnStyle = "bg-pink-100 text-pink-700 border-pink-400 hover:bg-pink-200 dark:bg-pink-950/60 dark:text-pink-300 font-bold";
             action = `onclick="promptShareRoom('${time}', '${booked.startTime}', '${booked.endTime}', '${booked.id}')"`;
-            label = `<span class="text-[10px] block text-pink-600">แชร์ได้ (จองร่วม ${memberCount}/12 คน)</span>${booked.roomTitle ? `<span class="text-[10px] block truncate w-full text-pink-700">🏷️ ${escapeHtml(booked.roomTitle)}</span>` : ''}`;
+            label = `<span class="text-[10px] block text-pink-600">แชร์ได้ (จองร่วม ${memberCount}/12 คน)</span>${booked.status === 'pending' ? '<span class="text-[10px] block text-amber-700 font-semibold">⏳ รอยืนยัน</span>' : ''}${booked.roomTitle ? `<span class="text-[10px] block truncate w-full text-pink-700">🏷️ ${escapeHtml(booked.roomTitle)}</span>` : ''}`;
           } else {
             btnStyle = booked.status === 'pending' ? "bg-amber-100 text-amber-800 border-amber-400 hover:bg-amber-200" : "bg-gray-300 text-gray-600 border-gray-400 hover:bg-red-100 hover:text-red-700 dark:bg-gray-700 dark:text-gray-400";
             action = `onclick="promptQueue('${time}', '${booked.startTime}', '${booked.endTime}')"`;
@@ -1358,7 +1369,9 @@
       
       const stdId = currentUser ? currentUser.studentId : null;
       const usedMins = getUserTotalBookedMinutesOnDate(stdId, selectedDateStr);
-      if (usedMins >= 120 && !(currentUser && currentUser.isAdmin)) { alert(QUOTA_MSG); return; }
+      if (usedMins >= 120 && !(currentUser && currentUser.isAdmin)) { showInfoModal('⏱ โควตาเต็มแล้ว', QUOTA_MSG); return; }
+      const _own = ownBookingAt(selectedDateStr, startTime);
+      if (_own) { showInfoModal('📌 คุณมีคิวจองช่วงนี้อยู่แล้ว', `${_own.roomName} ${_own.startTime}-${_own.endTime} น.\n1 รหัสจองได้ทีละห้องในเวลาเดียวกัน`); return; }
       const remainingQuota = Math.max(15, 120 - usedMins);
       
       const nextBusy = realTimeBookings.filter(b => b.roomId === selectedRoom.id && b.date === selectedDateStr && timeToMins(b.startTime) > startMins).map(b => timeToMins(b.startTime));
@@ -1747,6 +1760,8 @@
     function quickBook(roomId, time) {
       if (isRoomClosed(roomId)) { alert('🔴 ห้องนี้ปิดให้บริการชั่วคราว'); return; }
       if (getDayHours(selectedDateStr).closed) { alert('🔴 ห้องสมุดปิดทำการในวันนี้'); return; }
+      const _own = ownBookingAt(selectedDateStr, time);
+      if (_own) { showInfoModal('📌 คุณมีคิวจองช่วงนี้อยู่แล้ว', `${_own.roomName} ${_own.startTime}-${_own.endTime} น.\n1 รหัสจองได้ทีละห้องในเวลาเดียวกัน`); return; }
       const room = ALL_ROOMS.find(r => r.id === roomId);
       const s = timeToMins(time), close = getDayHours(selectedDateStr).close * 60;
       const used = currentUser && !currentUser.isAdmin ? getUserTotalBookedMinutesOnDate(currentUser.studentId, selectedDateStr) : 0;
@@ -1794,7 +1809,7 @@
         for (let m = open; m < close; m += 15) {
           const b = getBookingAt(r.id, m), t = minsToTime(m);
           let cls, act = '', tip = t;
-          if (b) { cls = (b.status === 'pending' ? 'bg-amber-400' : b.isShareable ? 'bg-pink-400' : 'bg-red-500') + ' cursor-pointer'; act = `openRoomQueue('${r.id}')`; tip = (b.roomTitle ? b.roomTitle + ' · ' : '') + b.startTime + '-' + b.endTime; }
+          if (b) { cls = (b.isShareable ? 'bg-pink-400' : b.status === 'pending' ? 'bg-amber-400' : 'bg-red-500') + ' cursor-pointer'; act = `openRoomQueue('${r.id}')`; tip = (b.roomTitle ? b.roomTitle + ' · ' : '') + b.startTime + '-' + b.endTime; }
           else if ((isToday && m <= cur) || isRoomClosed(r.id)) cls = 'bg-gray-200 dark:bg-gray-700';
           else { cls = 'bg-emerald-400 hover:bg-emerald-500 cursor-pointer'; act = `quickBook('${r.id}','${t}')`; tip = 'จองเริ่ม ' + t; }
           h += `<td ${act ? `onclick="${act}"` : ''} title="${escapeHtml(tip)}" class="h-9 min-w-[26px] rounded-md bg-clip-padding ${m % 60 === 0 ? 'border-l-[3px] border-transparent' : ''} ${cls}"></td>`;
@@ -1885,6 +1900,9 @@
     }
 
     loadSiteSettings(); setInterval(loadSiteSettings, 60000);
+    // ข้ามเที่ยงคืน: รีเฟรชอัตโนมัติ (กันหน้าค้างเป็นวันเก่าแล้วขึ้นว่าไม่ว่างทั้งวัน)
+    const _dayKey = formatDateISO(new Date());
+    setInterval(() => { if (formatDateISO(new Date()) !== _dayKey && document.getElementById('pageBookingForm').classList.contains('hidden')) location.reload(); }, 60000);
 
     // ===== 📣 แจ้งปัญหา / ส่งความคิดเห็น =====
     let _lastReport = 0;
